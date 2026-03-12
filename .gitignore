@@ -1,0 +1,19 @@
+# Ordner
+/Anhänge/
+/Excellisten/
+Backups/
+/__pycache__/
+dist/
+/build/
+
+# Dateien
+Verbesserungen.txt
+Original-Arbeitstabelle.XLSX
+*.log
+Auftragsbeschreibung.md1
+ClaudeCode_Inventur_Prompt_1.md
+ClaudeCode_Inventur_Erweiterung_V2.md
+create_sample_arbeitstabelle.py
+Inventur_Granulat.xlsx
+Inventur_Rollen.xlsx
+InventurAnforderungen für CZ.xlsx
