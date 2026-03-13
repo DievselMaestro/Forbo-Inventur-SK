@@ -46,9 +46,13 @@ On first launch the program will ask you to locate this file.
 | `Material` | Material number |
 | `Materialkurztext` | Material description |
 | `Werk` | Plant |
-| `LÖrt` | Storage location (master) |
-| `Flache` | Area (m²) |
-| `+Frei verw.` | Free usable quantity |
+| `Lagerort` | Storage location (master) |
+| `fläche` | Area (m²) |
+| `frei verw.` | Free usable quantity |
+| `lnge` / `brte` | Stage 0 length / width |
+| `Lnge1` / `brte1` | Stage 1 length / width |
+| `lnge2` / `brte2` | Stage 2 length / width |
+| `fach` | Default shelf location |
 
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
@@ -75,14 +79,15 @@ Settings are saved to `config/settings_sk.json`.
 
 2. **Roll found (green)**
    - Roll data is displayed automatically
-   - Enter the **Shelf Location** (mandatory)
-   - Optionally add a **Remark**
-   - Press **ENTER** or click **Save**
+   - Scan or type the **Shelf Location** and press **ENTER** → cursor jumps to Measured Width
+   - Enter the **Measured Width (mm)** and press **ENTER** → entry is saved automatically
+   - Optionally add a **Remark** before pressing ENTER on the width field
+   - Alternatively click **Save** at any point
 
 3. **Roll not found**
    - A manual entry dialog opens
    - Pre-filled fields (from QR code): Batch No., Location (QR), all dimension stages
-   - Fields to fill in manually: **Material No.** (mandatory), Description, **Shelf Location** (mandatory), Remarks
+   - Fields to fill in manually: **Material No.** (mandatory), Description, **Shelf Location** (mandatory), **Measured Width (mm)** (mandatory), Remarks
    - Click **Save** or press **ENTER**
 
 4. **Duplicate protection**
@@ -105,7 +110,9 @@ If the scanned value contains no semicolons, the entire string is treated as the
 
 | Key | Action |
 |-----|--------|
-| `ENTER` | Confirm scan / Save |
+| `ENTER` on Shelf Location | Jump to Measured Width field |
+| `ENTER` on Measured Width | Save the entry |
+| `ENTER` on Remarks | Save the entry |
 | `ESC` | Cancel current scan |
 | `Ctrl+Z` | Undo last entry |
 | `Ctrl+S` | Manual save |
@@ -140,6 +147,7 @@ The file contains two sheets:
 | Area (m2) | Area from master table |
 | Free Usable | Free usable quantity |
 | Shelf Location | Shelf location entered during scan |
+| Measured Width (mm) | Width measured during scan (control value) |
 | Remarks | Optional remark |
 
 > **Note:** The Batch No. column is always formatted as text to preserve leading zeros (e.g. `0618639923`).

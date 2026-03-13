@@ -8,7 +8,6 @@ Desktop application for warehouse inventory with barcode scanner integration.
 Supports Rolls only (no granulate).
 Developed for Windows 11, Python 3.11+
 
-Author: 
 Date: March 2026
 Version: 1.0 SK
 """
@@ -202,12 +201,14 @@ class NotFoundDialogSK:
         self.material_var = tk.StringVar()
         self.kurztext_var = tk.StringVar()
         self.fach_var = tk.StringVar()
+        self.brte_meas_var = tk.StringVar()
         self.remarks_var = tk.StringVar()
 
         fields = [
             ("Material No. *:", self.material_var, True),
             ("Description:", self.kurztext_var, False),
             ("Shelf Location *:", self.fach_var, True),
+            ("Measured Width (mm) *:", self.brte_meas_var, True),
             ("Remarks:", self.remarks_var, False),
         ]
 
@@ -235,12 +236,16 @@ class NotFoundDialogSK:
     def _save(self):
         material = self.material_var.get().strip()
         fach = self.fach_var.get().strip()
+        brte_meas = self.brte_meas_var.get().strip()
 
         if not material:
             messagebox.showerror("Error", "Material is a required field.", parent=self.dialog)
             return
         if not fach:
             messagebox.showerror("Error", "Shelf Location is a required field.", parent=self.dialog)
+            return
+        if not brte_meas:
+            messagebox.showerror("Error", "Measured Width (mm) is a required field.", parent=self.dialog)
             return
 
         self.result = {
@@ -259,6 +264,7 @@ class NotFoundDialogSK:
             "flache": "",
             "frei_verw": "",
             "fach": fach,
+            "brte_meas": brte_meas,
             "remarks": self.remarks_var.get().strip(),
             "status": "not_found",
         }
@@ -414,7 +420,7 @@ class InventurAppSK:
     def parse_qr_code(self, raw):
         """Parse semicolon-delimited QR code.
 
-        Format: LÖrt;Charge;Lnge0;Brte0;Lnge1;Brte1;Lnge2;Brte2
+        Format: Lort;Charge;Lnge0;Brte0;Lnge1;Brte1;Lnge2;Brte2
         Fallback: treat whole string as Charge.
 
         Returns dict with keys:
@@ -710,11 +716,11 @@ class InventurAppSK:
         dim_frame.columnconfigure(5, weight=1)
 
         ttk.Label(dim_frame, text="Stage 0", font=("Arial", 10, "bold")).grid(
-            row=0, column=0, columnspan=2, padx=(0, 16))
+            row=0, column=0, columnspan=2, sticky=tk.W, padx=(0, 16))
         ttk.Label(dim_frame, text="Stage 1", font=("Arial", 10, "bold")).grid(
-            row=0, column=2, columnspan=2, padx=(0, 16))
+            row=0, column=2, columnspan=2, sticky=tk.W, padx=(0, 16))
         ttk.Label(dim_frame, text="Stage 2", font=("Arial", 10, "bold")).grid(
-            row=0, column=4, columnspan=2)
+            row=0, column=4, columnspan=2, sticky=tk.W)
 
         # Stage 0
         ttk.Label(dim_frame, text="Length:", font=("Arial", 9)).grid(
@@ -753,8 +759,9 @@ class InventurAppSK:
             row=6, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=8)
 
     def _create_input_panel(self):
-        """Create user input widgets (Fach + Remarks)."""
+        """Create user input widgets (Fach + Measured Width + Remarks)."""
         self.fach_var = tk.StringVar()
+        self.brte_meas_var = tk.StringVar()
         self.remarks_var = tk.StringVar()
         self.input_widgets = {}
 
@@ -763,30 +770,40 @@ class InventurAppSK:
                                    sticky=(tk.W, tk.E), pady=4)
         self.input_container.columnconfigure(1, weight=1)
 
-        # Fach (mandatory)
+        # Fach (mandatory) — row 0
         lbl_fach = ttk.Label(self.input_container, text="Shelf Location *:",
                               font=("Arial", 11, "bold"))
         lbl_fach.grid(row=0, column=0, sticky=tk.W, pady=5)
         entry_fach = ttk.Entry(self.input_container, textvariable=self.fach_var,
                                 font=("Arial", 12), width=20)
         entry_fach.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
-        entry_fach.bind("<Return>", self.save_current_scan)
+        entry_fach.bind("<Return>", lambda e: self.input_widgets["brte_meas_entry"].focus_set())
         self.input_widgets["fach_entry"] = entry_fach
 
-        # Remarks (optional)
+        # Measured Width (mandatory) — row 1
+        lbl_brte_meas = ttk.Label(self.input_container, text="Measured Width (mm) *:",
+                                   font=("Arial", 11, "bold"))
+        lbl_brte_meas.grid(row=1, column=0, sticky=tk.W, pady=5)
+        entry_brte_meas = ttk.Entry(self.input_container, textvariable=self.brte_meas_var,
+                                     font=("Arial", 12), width=10)
+        entry_brte_meas.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_brte_meas.bind("<Return>", self.save_current_scan)
+        self.input_widgets["brte_meas_entry"] = entry_brte_meas
+
+        # Remarks (optional) — row 2
         lbl_remarks = ttk.Label(self.input_container, text="Remarks (optional):",
                                  font=("Arial", 11, "bold"))
-        lbl_remarks.grid(row=1, column=0, sticky=tk.W, pady=5)
+        lbl_remarks.grid(row=2, column=0, sticky=tk.W, pady=5)
         entry_remarks = ttk.Entry(self.input_container, textvariable=self.remarks_var,
                                    font=("Arial", 12), width=50)
-        entry_remarks.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_remarks.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_remarks.bind("<Return>", self.save_current_scan)
         self.input_widgets["remarks_entry"] = entry_remarks
 
-        # Save button
+        # Save button — row 3
         save_btn = ttk.Button(self.input_container, text="Save",
                                command=self.save_current_scan)
-        save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
+        save_btn.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.input_widgets["save_button"] = save_btn
 
     # --- List section ---
@@ -913,7 +930,7 @@ class InventurAppSK:
         """Display found roll data and show the input panel."""
         self.current_scan = {
             "charge": qr["charge"],
-            "lort_master": str(row_data.get("LÖrt", "") or ""),
+            "lort_master": str(row_data.get("Lagerort", "") or ""),
             "lort_qr": qr["lort"],
             "material": str(row_data.get("Material", "") or ""),
             "kurztext": str(row_data.get("Materialkurztext", "") or ""),
@@ -924,8 +941,8 @@ class InventurAppSK:
             "brte1": qr["brte1"],
             "lnge2": qr["lnge2"],
             "brte2": qr["brte2"],
-            "flache": str(row_data.get("Flache", "") or ""),
-            "frei_verw": str(row_data.get("+Frei verw.", "") or ""),
+            "flache": str(row_data.get("fläche", "") or ""),
+            "frei_verw": str(row_data.get("frei verw.", "") or ""),
             "status": "found",
         }
 
@@ -950,6 +967,7 @@ class InventurAppSK:
 
         # Reset input fields
         self.fach_var.set("")
+        self.brte_meas_var.set("")
         self.remarks_var.set("")
         self.input_widgets["fach_entry"].focus_set()
 
@@ -1007,7 +1025,17 @@ class InventurAppSK:
             self.input_widgets["fach_entry"].focus_set()
             return
 
+        brte_meas = self.brte_meas_var.get().strip()
+        if not brte_meas:
+            messagebox.showwarning(
+                "Required Field",
+                "Measured Width (mm) is mandatory. Please enter a value.",
+            )
+            self.input_widgets["brte_meas_entry"].focus_set()
+            return
+
         self.current_scan["fach"] = fach
+        self.current_scan["brte_meas"] = brte_meas
         self.current_scan["remarks"] = self.remarks_var.get().strip()
         self.current_scan["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
@@ -1040,6 +1068,7 @@ class InventurAppSK:
         self.current_qr_data = None
         self.scan_var.set("")
         self.fach_var.set("")
+        self.brte_meas_var.set("")
         self.remarks_var.set("")
         self.current_frame.grid_remove()
         self.scan_entry.focus_set()
@@ -1106,6 +1135,7 @@ class InventurAppSK:
         "Area (m2)",          # was: Flache
         "Free Usable",        # was: +Frei verw.
         "Shelf Location",     # was: Shelf (Fach)
+        "Measured Width (mm)",  # control value entered during scan
         "Remarks",
     ]
 
@@ -1135,6 +1165,7 @@ class InventurAppSK:
             _clean(d.get("flache", "")),
             _clean(d.get("frei_verw", "")),
             _clean(d.get("fach", "")),
+            _clean(d.get("brte_meas", "")),
             _clean(d.get("remarks", "")),
         ]
 
@@ -1240,6 +1271,7 @@ class InventurAppSK:
             "flache": _str(row.get("Area (m2)", "")),
             "frei_verw": _str(row.get("Free Usable", "")),
             "fach": _str(row.get("Shelf Location", "")),
+            "brte_meas": _str(row.get("Measured Width (mm)", "")),
             "remarks": _str(row.get("Remarks", "")),
             "status": status,
         }
