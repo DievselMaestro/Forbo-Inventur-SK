@@ -101,7 +101,7 @@ Settings are saved to `config/settings_sk.json`.
 The program parses semicolon-delimited QR codes:
 
 ```
-LÖrt;Charge;Lnge0;Brte0;Lnge1;Brte1;Lnge2;Brte2
+Locat;Charge;Lnge0;Brte0;Lnge1;Brte1;Lnge2;Brte2
 ```
 
 Three dimension stages are supported (Stage 0, Stage 1, Stage 2), each with Length and Width in mm.
