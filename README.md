@@ -47,12 +47,13 @@ On first launch the program will ask you to locate this file.
 | `Materialkurztext` | Material description |
 | `Werk` | Plant |
 | `Lagerort` | Storage location (master) |
-| `fläche` | Area (m²) |
-| `frei verw.` | Free usable quantity |
-| `lnge` / `brte` | Stage 0 length / width |
-| `Lnge1` / `brte1` | Stage 1 length / width |
-| `lnge2` / `brte2` | Stage 2 length / width |
-| `fach` | Default shelf location |
+| `Länge m` | Stage 0 length in metres |
+| `Breite mm` | Stage 0 width in mm |
+| `Frei verwendbar` | Free usable area (m²) |
+| `Lnge1` / `Brte1` | Stage 1 length (m) / width (mm) |
+| `Lnge2` / `Brte2` | Stage 2 length (m) / width (mm) |
+
+> **Note:** Area (m²) is calculated automatically from `Länge m × Breite mm / 1000`. There is no separate area column in the master table.
 
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
@@ -144,8 +145,8 @@ The file contains two sheets:
 | Batch No. | Batch number (formatted as text) |
 | Length S0–S2 (mm) | Roll length per stage |
 | Width S0–S2 (mm) | Roll width per stage |
-| Area (m2) | Area from master table |
-| Free Usable | Free usable quantity |
+| Area (m2) | Calculated: `Länge m × Breite mm / 1000` |
+| Free Usable | Free usable area (m²) from master table column `Frei verwendbar` |
 | Shelf Location | Shelf location entered during scan |
 | Measured Width (mm) | Width measured during scan (control value) |
 | Remarks | Optional remark |

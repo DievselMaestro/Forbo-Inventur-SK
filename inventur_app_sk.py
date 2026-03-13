@@ -928,21 +928,50 @@ class InventurAppSK:
 
     def show_found_rolle(self, row_data, qr):
         """Display found roll data and show the input panel."""
+        def _fmt_int(val):
+            """Format numeric value as integer string (remove .0)."""
+            if val == "" or val is None:
+                return ""
+            try:
+                return str(int(float(val)))
+            except (ValueError, TypeError):
+                return str(val)
+
+        def _fmt_float2(val):
+            """Format float to 2 decimal places, empty if missing."""
+            if val == "" or val is None:
+                return ""
+            try:
+                return f"{float(val):.2f}"
+            except (ValueError, TypeError):
+                return str(val)
+
+        # Compute Area (m2) from Länge m × Breite mm / 1000
+        laenge_m = row_data.get("Länge m", None)
+        breite_mm = row_data.get("Breite mm", None)
+        if laenge_m not in (None, "") and breite_mm not in (None, ""):
+            try:
+                flache_val = f"{float(laenge_m) * float(breite_mm) / 1000:.2f}"
+            except (ValueError, TypeError):
+                flache_val = ""
+        else:
+            flache_val = ""
+
         self.current_scan = {
             "charge": qr["charge"],
-            "lort_master": str(row_data.get("Lagerort", "") or ""),
+            "lort_master": _fmt_int(row_data.get("Lagerort", "") or ""),
             "lort_qr": qr["lort"],
-            "material": str(row_data.get("Material", "") or ""),
+            "material": _fmt_int(row_data.get("Material", "") or ""),
             "kurztext": str(row_data.get("Materialkurztext", "") or ""),
-            "werk": str(row_data.get("Werk", "") or ""),
+            "werk": _fmt_int(row_data.get("Werk", "") or ""),
             "lnge0": qr["lnge0"],
             "brte0": qr["brte0"],
             "lnge1": qr["lnge1"],
             "brte1": qr["brte1"],
             "lnge2": qr["lnge2"],
             "brte2": qr["brte2"],
-            "flache": str(row_data.get("fläche", "") or ""),
-            "frei_verw": str(row_data.get("frei verw.", "") or ""),
+            "flache": flache_val,
+            "frei_verw": _fmt_float2(row_data.get("Frei verwendbar", "") or ""),
             "status": "found",
         }
 
