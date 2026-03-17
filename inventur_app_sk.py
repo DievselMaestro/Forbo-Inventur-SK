@@ -766,7 +766,7 @@ class InventurAppSK:
         else:
             self.export_path = self.base_dir
 
-        self.inventur_path = self.export_path / "Inventory_Rolls_SK.xlsx"
+        self.inventur_path = self.export_path / "Inventory_HALB.xlsx"
         backup_dir = self.export_path / "backups"
         try:
             backup_dir.mkdir(parents=True, exist_ok=True)
@@ -2477,7 +2477,7 @@ class InventurAppSK:
             ws[f"{charge_col}{r}"].number_format = "@"
 
     def save_cz_excel(self):
-        """Write Inventory_Rolls_SK.xlsx with Inventory and Not_Found sheets."""
+        """Write Inventory_HALB.xlsx with Inventory and Not_Found sheets."""
         try:
             wb = Workbook()
             if "Sheet" in wb.sheetnames:
@@ -2647,7 +2647,7 @@ class InventurAppSK:
     # ------------------------------------------------------------------
 
     def load_existing_cz(self):
-        """Resume a previous session by loading Inventory_Rolls_SK.xlsx."""
+        """Resume a previous session by loading Inventory_HALB.xlsx."""
         if not self.inventur_path.exists():
             return
 
@@ -2881,7 +2881,7 @@ class InventurAppSK:
                 self.save_cz_excel()
                 backup_dir = self.export_path / "backups"
                 backup_dir.mkdir(parents=True, exist_ok=True)
-                backup_file = backup_dir / f"Inventory_Rolls_SK_Backup_{timestamp}.xlsx"
+                backup_file = backup_dir / f"Inventory_HALB_Backup_{timestamp}.xlsx"
                 if self.inventur_path.exists():
                     shutil.copy2(self.inventur_path, backup_file)
                     messagebox.showinfo(

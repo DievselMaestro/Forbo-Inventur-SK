@@ -3,7 +3,7 @@
 ## Overview
 
 Desktop application for warehouse inventory at **Forbo**.
-Supports **three warehouse modes**: **Lager 1 (SK)**, **Zert**, and **KMAT**.
+Supports **three warehouse modes**: **HALB**, **ZERT**, and **KMAT**.
 
 - Version: **2.2**
 - Platform: Windows 11, Python 3.11+
@@ -38,7 +38,7 @@ Copy all program files into a folder on your computer.
 Place your master table Excel files anywhere accessible.
 On first launch the program will ask you to locate the relevant file.
 
-**Required columns – Lager 1 (SK) master table:**
+**Required columns – HALB master table:**
 
 | Column | Description |
 |--------|-------------|
@@ -54,7 +54,7 @@ On first launch the program will ask you to locate the relevant file.
 | `length1` / `width1` | Stage 1 length (m) / width (mm) |
 | `length2` / `width2` | Stage 2 length (m) / width (mm) |
 
-**Required columns – Zert master table:**
+**Required columns – ZERT master table:**
 
 | Column | Description |
 |--------|-------------|
@@ -86,7 +86,7 @@ On first launch the program will ask you to locate the relevant file.
 
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
-2. The warehouse selection dialog opens — select **Lager 1 (SK)**, **Zert**, or **KMAT**
+2. The warehouse selection dialog opens — select **HALB**, **ZERT**, or **KMAT**
 3. The application opens maximised automatically
 
 ---
@@ -106,8 +106,8 @@ Every time the application starts, a selection dialog appears:
 
 | Button | Description |
 |--------|-------------|
-| **Lager 1 (SK)** | Forbo SK – Malacky warehouse (Rolls, Fach + Width input) |
-| **Zert** | Zert warehouse (Charge-based, quantity input only) |
+| **HALB** | Forbo HALB – Malacky warehouse (Rolls, Fach + Width input) |
+| **ZERT** | ZERT warehouse (Charge-based, quantity input only) |
 | **KMAT** | KMAT warehouse (Customer order + Position, quantity input) |
 
 Closing the dialog without a selection exits the application.
@@ -116,7 +116,7 @@ Closing the dialog without a selection exits the application.
 
 ## Usage Guide
 
-### Lager 1 (SK) – Basic workflow
+### HALB – Basic workflow
 
 1. **Scan a QR code or barcode**
    - The scan field is always focused
@@ -137,7 +137,7 @@ Closing the dialog without a selection exits the application.
 4. **Duplicate protection**
    - Already scanned batch numbers are detected automatically and blocked
 
-### Zert – Basic workflow
+### ZERT – Basic workflow
 
 1. **Scan a QR code or barcode**
    - Same semicolon-delimited format; the batch number is extracted automatically
@@ -151,7 +151,7 @@ Closing the dialog without a selection exits the application.
    - A simplified dialog opens with: Charge (pre-filled), **Material No.** (mandatory), **Recorded Quantity** (mandatory), Remarks (optional)
 
 4. **Duplicate protection**
-   - Applies within the Zert session separately from SK
+   - Applies within the ZERT session separately from HALB
 
 ### KMAT – Basic workflow
 
@@ -171,7 +171,7 @@ Closing the dialog without a selection exits the application.
 4. **Duplicate protection**
    - The combination of Special stock number + POS is checked — re-scanning the same combination is blocked
 
-### QR Code Format (SK and Zert modes)
+### QR Code Format (HALB and ZERT modes)
 
 The program parses semicolon-delimited QR codes:
 
@@ -195,7 +195,7 @@ If the scanned value contains no semicolons, the entire string is treated as the
 
 ## Output Files
 
-### Lager 1 (SK): `Inventory_Rolls_SK.xlsx`
+### HALB: `Inventory_HALB.xlsx`
 
 | Sheet | Content |
 |-------|---------|
@@ -221,7 +221,7 @@ If the scanned value contains no semicolons, the entire string is treated as the
 | Measured Width (mm) | Width measured during scan |
 | Remarks | Optional remark |
 
-### Zert: `Inventory_Zert.xlsx`
+### ZERT: `Inventory_ZERT.xlsx`
 
 | Sheet | Content |
 |-------|---------|
@@ -284,8 +284,8 @@ No data is lost if the application closes unexpectedly.
 
 Click **Export / Backup** to create a timestamped copy of the current inventory file:
 
-- SK mode: `backups/Inventory_Rolls_SK_Backup_YYYYMMDD_HHMMSS.xlsx`
-- Zert mode: `backups/Inventory_Zert_Backup_YYYYMMDD_HHMMSS.xlsx`
+- HALB mode: `backups/Inventory_HALB_Backup_YYYYMMDD_HHMMSS.xlsx`
+- ZERT mode: `backups/Inventory_ZERT_Backup_YYYYMMDD_HHMMSS.xlsx`
 - KMAT mode: `backups/Inventory_KMAT_Backup_YYYYMMDD_HHMMSS.xlsx`
 
 The original file is not modified.
@@ -302,7 +302,7 @@ When the program starts and a warehouse is selected, it automatically loads any 
 
 At the start of a new inventory cycle:
 
-1. Rename or archive the current inventory file (e.g. `Inventory_Rolls_SK_2025.xlsx`)
+1. Rename or archive the current inventory file (e.g. `Inventory_HALB_2025.xlsx`)
 2. Replace the master table with the new file
 3. Start the program — a fresh inventory file will be created automatically
 
@@ -318,13 +318,13 @@ inventur-programm-f/
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This documentation
 ├── icon.ico                  # Application icon (optional)
-├── Inventory_Rolls_SK.xlsx   # SK inventory output (auto-created)
-├── Inventory_Zert.xlsx       # Zert inventory output (auto-created)
+├── Inventory_HALB.xlsx   # HALB inventory output (auto-created)
+├── Inventory_ZERT.xlsx       # ZERT inventory output (auto-created)
 ├── Inventory_KMAT.xlsx       # KMAT inventory output (auto-created)
 ├── backups/                  # Timestamped backup files
 ├── data/
-│   ├── Arbeitstabelle_Rollen_St012.XLSX   # SK master table
-│   ├── Arbeitstabelle_ZERT_v2.xlsx        # Zert master table
+│   ├── Arbeitstabelle_Rollen_St012.XLSX   # HALB master table
+│   ├── Arbeitstabelle_ZERT_v2.xlsx        # ZERT master table
 │   └── Arbeitstabelle_KMAT.xlsx           # KMAT master table
 └── config/
     ├── settings_sk.json      # Application settings
@@ -353,10 +353,10 @@ Settings file: `config/settings_sk.json`
 | Setting | Description |
 |---------|-------------|
 | `auto_save` | Save after every scan (recommended: `true`) |
-| `arbeitstabelle_path` | Full path to the SK master table Excel file |
-| `export_path` | Folder for SK inventory file and backups |
-| `arbeitstabelle_zert_path` | Full path to the Zert master table Excel file |
-| `export_zert_path` | Folder for Zert inventory file and backups |
+| `arbeitstabelle_path` | Full path to the HALB master table Excel file |
+| `export_path` | Folder for HALB inventory file and backups |
+| `arbeitstabelle_zert_path` | Full path to the ZERT master table Excel file |
+| `export_zert_path` | Folder for ZERT inventory file and backups |
 | `arbeitstabelle_kmat_path` | Full path to the KMAT master table Excel file |
 | `export_kmat_path` | Folder for KMAT inventory file and backups |
 | `vollbild` | Start maximised (`true` recommended) |
