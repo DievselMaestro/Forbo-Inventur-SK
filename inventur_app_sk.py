@@ -6,10 +6,11 @@ INVENTORY PROGRAM FOR FORBO SK - MALACKY WAREHOUSE MANAGEMENT
 
 Desktop application for warehouse inventory with barcode scanner integration.
 Supports Rolls only (no granulate).
+Supports two warehouse modes: SK (Malacky) and Zert.
 Developed for Windows 11, Python 3.11+
 
 Date: March 2026
-Version: 1.0 SK
+Version: 1.1 SK+Zert
 """
 
 import tkinter as tk
@@ -27,6 +28,87 @@ import logging
 
 
 # ---------------------------------------------------------------------------
+# Warehouse Selection Dialog
+# ---------------------------------------------------------------------------
+
+class WarehouseSelectionDialog:
+    """Startup dialog: select which warehouse to scan."""
+
+    def __init__(self, parent):
+        self.result = None
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Lager auswählen / Select Warehouse")
+        self.dialog.geometry("620x220")
+        self.dialog.resizable(False, False)
+        self.dialog.grab_set()
+        # Center on screen
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - 310
+        y = (self.dialog.winfo_screenheight() // 2) - 110
+        self.dialog.geometry(f"+{x}+{y}")
+        self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
+
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text="Welches Lager scannen?\nWhich warehouse to scan?",
+            font=("Arial", 13, "bold"),
+            justify=tk.CENTER,
+        ).pack(pady=(0, 20))
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack()
+
+        tk.Button(
+            btn_frame,
+            text="HALB",
+            font=("Arial", 14, "bold"),
+            bg="#1f4e79",
+            fg="white",
+            width=14,
+            height=2,
+            command=lambda: self._select("SK"),
+        ).pack(side=tk.LEFT, padx=(0, 20))
+
+        tk.Button(
+            btn_frame,
+            text="ZERT",
+            font=("Arial", 14, "bold"),
+            bg="#375623",
+            fg="white",
+            width=14,
+            height=2,
+            command=lambda: self._select("Zert"),
+        ).pack(side=tk.LEFT, padx=(0, 20))
+
+        tk.Button(
+            btn_frame,
+            text="KMAT",
+            font=("Arial", 14, "bold"),
+            bg="#6b1f1f",
+            fg="white",
+            width=14,
+            height=2,
+            command=lambda: self._select("KMAT"),
+        ).pack(side=tk.LEFT, padx=(20, 0))
+
+    def _select(self, mode):
+        self.result = mode
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
 # Settings Dialog
 # ---------------------------------------------------------------------------
 
@@ -39,7 +121,7 @@ class SettingsDialog:
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Settings")
-        self.dialog.geometry("620x280")
+        self.dialog.geometry("620x580")
         self.dialog.resizable(True, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -54,8 +136,8 @@ class SettingsDialog:
         frame = ttk.Frame(self.dialog, padding="15")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        # --- Master Table path ---
-        ttk.Label(frame, text="Master Table file (*.xlsx):", font=("Arial", 10, "bold")).grid(
+        # --- SK Master Table path ---
+        ttk.Label(frame, text="SK Master Table file (*.xlsx):", font=("Arial", 10, "bold")).grid(
             row=0, column=0, sticky=tk.W, pady=(0, 4))
 
         self.master_path_var = tk.StringVar(
@@ -66,8 +148,8 @@ class SettingsDialog:
         ttk.Button(frame, text="Browse...", command=self._browse_master).grid(
             row=1, column=1, sticky=tk.W)
 
-        # --- Export folder ---
-        ttk.Label(frame, text="Export output folder:", font=("Arial", 10, "bold")).grid(
+        # --- SK Export folder ---
+        ttk.Label(frame, text="SK Export output folder:", font=("Arial", 10, "bold")).grid(
             row=2, column=0, sticky=tk.W, pady=(16, 4))
 
         self.export_path_var = tk.StringVar(
@@ -78,11 +160,59 @@ class SettingsDialog:
         ttk.Button(frame, text="Browse...", command=self._browse_export).grid(
             row=3, column=1, sticky=tk.W)
 
+        # --- Zert Master Table path ---
+        ttk.Label(frame, text="Zert Master Table (*.xlsx):", font=("Arial", 10, "bold")).grid(
+            row=4, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.zert_master_path_var = tk.StringVar(
+            value=self.config.get("arbeitstabelle_zert_path", ""))
+        zert_master_entry = ttk.Entry(frame, textvariable=self.zert_master_path_var, width=55)
+        zert_master_entry.grid(row=5, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_zert_master).grid(
+            row=5, column=1, sticky=tk.W)
+
+        # --- Zert Export folder ---
+        ttk.Label(frame, text="Zert Export folder:", font=("Arial", 10, "bold")).grid(
+            row=6, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.zert_export_path_var = tk.StringVar(
+            value=self.config.get("export_zert_path", ""))
+        zert_export_entry = ttk.Entry(frame, textvariable=self.zert_export_path_var, width=55)
+        zert_export_entry.grid(row=7, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_zert_export).grid(
+            row=7, column=1, sticky=tk.W)
+
+        # --- KMAT Master Table path ---
+        ttk.Label(frame, text="KMAT Master Table (*.xlsx):", font=("Arial", 10, "bold")).grid(
+            row=8, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.kmat_master_path_var = tk.StringVar(
+            value=self.config.get("arbeitstabelle_kmat_path", ""))
+        kmat_master_entry = ttk.Entry(frame, textvariable=self.kmat_master_path_var, width=55)
+        kmat_master_entry.grid(row=9, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_kmat_master).grid(
+            row=9, column=1, sticky=tk.W)
+
+        # --- KMAT Export folder ---
+        ttk.Label(frame, text="KMAT Export folder:", font=("Arial", 10, "bold")).grid(
+            row=10, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.kmat_export_path_var = tk.StringVar(
+            value=self.config.get("export_kmat_path", ""))
+        kmat_export_entry = ttk.Entry(frame, textvariable=self.kmat_export_path_var, width=55)
+        kmat_export_entry.grid(row=11, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_kmat_export).grid(
+            row=11, column=1, sticky=tk.W)
+
         frame.columnconfigure(0, weight=1)
 
         # --- Buttons ---
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=4, column=0, columnspan=2, pady=(24, 0))
+        btn_frame.grid(row=12, column=0, columnspan=2, pady=(24, 0))
 
         ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(
             side=tk.LEFT, padx=(0, 12))
@@ -94,20 +224,50 @@ class SettingsDialog:
 
     def _browse_master(self):
         path = filedialog.askopenfilename(
-            title="Select Master Table file",
+            title="Select SK Master Table file",
             filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
         )
         if path:
             self.master_path_var.set(path)
 
     def _browse_export(self):
-        path = filedialog.askdirectory(title="Select Export output folder")
+        path = filedialog.askdirectory(title="Select SK Export output folder")
         if path:
             self.export_path_var.set(path)
+
+    def _browse_zert_master(self):
+        path = filedialog.askopenfilename(
+            title="Select Zert Master Table file",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+        if path:
+            self.zert_master_path_var.set(path)
+
+    def _browse_zert_export(self):
+        path = filedialog.askdirectory(title="Select Zert Export output folder")
+        if path:
+            self.zert_export_path_var.set(path)
+
+    def _browse_kmat_master(self):
+        path = filedialog.askopenfilename(
+            title="Select KMAT Master Table file",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+        if path:
+            self.kmat_master_path_var.set(path)
+
+    def _browse_kmat_export(self):
+        path = filedialog.askdirectory(title="Select KMAT Export output folder")
+        if path:
+            self.kmat_export_path_var.set(path)
 
     def _save(self):
         self.config["arbeitstabelle_path"] = self.master_path_var.get().strip()
         self.config["export_path"] = self.export_path_var.get().strip()
+        self.config["arbeitstabelle_zert_path"] = self.zert_master_path_var.get().strip()
+        self.config["export_zert_path"] = self.zert_export_path_var.get().strip()
+        self.config["arbeitstabelle_kmat_path"] = self.kmat_master_path_var.get().strip()
+        self.config["export_kmat_path"] = self.kmat_export_path_var.get().strip()
         self.result = self.config
         self.dialog.destroy()
 
@@ -276,11 +436,264 @@ class NotFoundDialogSK:
 
 
 # ---------------------------------------------------------------------------
+# NotFoundDialogZert
+# ---------------------------------------------------------------------------
+
+class NotFoundDialogZert:
+    """Dialog for Zert warehouse: charge not found in master table.
+    User supplies Material No. (mandatory), Quantity (mandatory), Remarks (optional).
+    """
+
+    def __init__(self, parent, charge):
+        self.result = None
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Charge Not Found - Manual Entry")
+        self.dialog.geometry("480x320")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
+        )
+        self._charge = charge
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text=f"Charge not found!\nCharge: {self._charge}",
+            font=("Arial", 12, "bold"),
+            foreground="red",
+            justify=tk.CENTER,
+        ).pack(pady=(0, 16))
+
+        info_frame = ttk.LabelFrame(frame, text="QR Data (read-only)", padding="8")
+        info_frame.pack(fill=tk.X, pady=(0, 12))
+        ttk.Label(info_frame, text="Charge:", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(info_frame, text=self._charge, font=("Arial", 9)).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
+
+        manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
+        manual_frame.pack(fill=tk.X, pady=(0, 12))
+
+        self.material_var = tk.StringVar()
+        self.menge_var = tk.StringVar()
+        self.remarks_var = tk.StringVar()
+
+        ttk.Label(manual_frame, text="Material No. *:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=4)
+        mat_entry = ttk.Entry(manual_frame, textvariable=self.material_var, width=30, font=("Arial", 10))
+        mat_entry.grid(row=0, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        mat_entry.focus_set()
+
+        ttk.Label(manual_frame, text="Recorded Quantity *:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=4)
+        menge_entry = ttk.Entry(manual_frame, textvariable=self.menge_var, width=15, font=("Arial", 10))
+        menge_entry.grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        ttk.Label(manual_frame, text="Remarks:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(manual_frame, textvariable=self.remarks_var, width=30, font=("Arial", 10)).grid(row=2, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=(8, 0))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _save(self):
+        material = self.material_var.get().strip()
+        menge = self.menge_var.get().strip()
+        if not material:
+            messagebox.showerror("Error", "Material No. is a required field.", parent=self.dialog)
+            return
+        if not menge:
+            messagebox.showerror("Error", "Recorded Quantity is a required field.", parent=self.dialog)
+            return
+        self.result = {
+            "charge": self._charge,
+            "material": material,
+            "kurztext": "",
+            "mart": "",
+            "werk": "",
+            "lort": "",
+            "bme": "",
+            "frei_verw": "",
+            "laenge_mm": "",
+            "breite_mm": "",
+            "adv": "",
+            "menge": menge,
+            "remarks": self.remarks_var.get().strip(),
+            "status": "not_found",
+        }
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
+# PositionInputDialog
+# ---------------------------------------------------------------------------
+
+class PositionInputDialog:
+    """Dialog to select Position for a scanned Kaufnummer."""
+
+    def __init__(self, parent, kauf, positions):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Select Position")
+        self.dialog.geometry("400x200")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 80, parent.winfo_rooty() + 80)
+        )
+        self._kauf = kauf
+        self._positions = positions
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text=f"Kauf-Nr.: {self._kauf}",
+                  font=("Arial", 12, "bold")).pack(pady=(0, 12))
+
+        ttk.Label(frame, text="Select Position:", font=("Arial", 10)).pack(anchor=tk.W)
+
+        self.pos_var = tk.StringVar()
+        if self._positions:
+            self.pos_var.set(self._positions[0])
+
+        combo = ttk.Combobox(frame, textvariable=self.pos_var,
+                             values=self._positions, font=("Arial", 12), width=15,
+                             state="readonly" if self._positions else "normal")
+        combo.pack(pady=(4, 16), anchor=tk.W)
+        combo.focus_set()
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack()
+        ttk.Button(btn_frame, text="OK", command=self._ok, width=10).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=10).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Return>", lambda e: self._ok())
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _ok(self):
+        pos = self.pos_var.get().strip()
+        if not pos:
+            messagebox.showerror("Error", "Please select or enter a position.", parent=self.dialog)
+            return
+        self.result = pos
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
+# NotFoundDialogKMAT
+# ---------------------------------------------------------------------------
+
+class NotFoundDialogKMAT:
+    """Dialog for KMAT: Kauf+POS not found in master table."""
+
+    def __init__(self, parent, kauf, pos):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Not Found - Manual Entry")
+        self.dialog.geometry("480x300")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
+        )
+        self._kauf = kauf
+        self._pos = pos
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text=f"Kauf+POS not found!\nKauf-Nr.: {self._kauf}  |  POS: {self._pos}",
+            font=("Arial", 12, "bold"),
+            foreground="red",
+            justify=tk.CENTER,
+        ).pack(pady=(0, 16))
+
+        manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
+        manual_frame.pack(fill=tk.X, pady=(0, 12))
+
+        self.material_var = tk.StringVar()
+        self.menge_var = tk.StringVar()
+        self.remarks_var = tk.StringVar()
+
+        ttk.Label(manual_frame, text="Material No. *:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=4)
+        mat_entry = ttk.Entry(manual_frame, textvariable=self.material_var, width=30, font=("Arial", 10))
+        mat_entry.grid(row=0, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        mat_entry.focus_set()
+
+        ttk.Label(manual_frame, text="Recorded Quantity *:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(manual_frame, textvariable=self.menge_var, width=15, font=("Arial", 10)).grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        ttk.Label(manual_frame, text="Remarks:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(manual_frame, textvariable=self.remarks_var, width=30, font=("Arial", 10)).grid(row=2, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=(8, 0))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _save(self):
+        material = self.material_var.get().strip()
+        menge = self.menge_var.get().strip()
+        if not material:
+            messagebox.showerror("Error", "Material No. is required.", parent=self.dialog)
+            return
+        if not menge:
+            messagebox.showerror("Error", "Recorded Quantity is required.", parent=self.dialog)
+            return
+        self.result = {
+            "kauf": self._kauf,
+            "pos": self._pos,
+            "material": material,
+            "kurztext": "",
+            "werk": "",
+            "lort": "",
+            "bme": "",
+            "frei_verw": "",
+            "menge": menge,
+            "remarks": self.remarks_var.get().strip(),
+            "status": "not_found",
+            "_mode": "kmat",
+        }
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
 # Main Application Class
 # ---------------------------------------------------------------------------
 
 class InventurAppSK:
-    """Inventory application for Forbo SK (Malacky) — Rolls only."""
+    """Inventory application for Forbo SK (Malacky) — Rolls only. Also supports Zert warehouse."""
 
     # ------------------------------------------------------------------
     # Initialisation
@@ -288,6 +701,15 @@ class InventurAppSK:
 
     def __init__(self):
         self.root = tk.Tk()
+
+        # Show warehouse selection before anything else
+        self.root.withdraw()
+        sel_dlg = WarehouseSelectionDialog(self.root)
+        if sel_dlg.result is None:
+            self.root.destroy()
+            sys.exit(0)
+        self.warehouse_mode = sel_dlg.result
+        self.root.deiconify()
 
         # Base paths (EXE-compatible)
         self.base_dir = Path(self.get_base_path())
@@ -313,7 +735,12 @@ class InventurAppSK:
         self.check_paths_on_startup()
 
         # Load existing session
-        self.load_existing_cz()
+        if self.warehouse_mode == "Zert":
+            self.load_existing_zert()
+        elif self.warehouse_mode == "KMAT":
+            self.load_existing_kmat()
+        else:
+            self.load_existing_cz()
 
         # Shortcuts
         self.bind_shortcuts()
@@ -346,6 +773,22 @@ class InventurAppSK:
         except Exception:
             pass
 
+        # Zert paths
+        zert_arb = self.config.get("arbeitstabelle_zert_path", "")
+        self.arbeitstabelle_zert_path = Path(zert_arb) if zert_arb else None
+
+        zert_exp = self.config.get("export_zert_path", "")
+        self.export_zert_path = Path(zert_exp) if zert_exp else self.base_dir
+        self.inventur_zert_path = self.export_zert_path / "Inventory_Zert.xlsx"
+
+        # KMAT paths
+        kmat_arb = self.config.get("arbeitstabelle_kmat_path", "")
+        self.arbeitstabelle_kmat_path = Path(kmat_arb) if kmat_arb else None
+
+        kmat_exp = self.config.get("export_kmat_path", "")
+        self.export_kmat_path = Path(kmat_exp) if kmat_exp else self.base_dir
+        self.inventur_kmat_path = self.export_kmat_path / "Inventory_KMAT.xlsx"
+
     # ------------------------------------------------------------------
     # Logging
     # ------------------------------------------------------------------
@@ -362,7 +805,7 @@ class InventurAppSK:
             ],
         )
         self.logger = logging.getLogger(__name__)
-        self.logger.info("Inventory SK application started")
+        self.logger.info(f"Inventory SK application started (mode: {getattr(self, 'warehouse_mode', 'unknown')})")
 
     # ------------------------------------------------------------------
     # Config
@@ -376,6 +819,10 @@ class InventurAppSK:
             "arbeitstabelle_path": "",
             "export_path": "",
             "vollbild": True,
+            "arbeitstabelle_zert_path": "",
+            "export_zert_path": "",
+            "arbeitstabelle_kmat_path": "",
+            "export_kmat_path": "",
         }
         try:
             if config_path.exists():
@@ -407,11 +854,21 @@ class InventurAppSK:
     def init_data(self):
         """Initialise data structures."""
         self.df_rollen = None
-        self.inventur_data = []       # found rolls
-        self.not_found_data = []      # not-found rolls
+        self.inventur_data = []       # found rolls (SK)
+        self.not_found_data = []      # not-found rolls (SK)
         self.current_scan = None
         self.current_qr_data = None
         self.undo_stack = []
+
+        # Zert data
+        self.df_zert = None
+        self.inventur_data_zert = []
+        self.not_found_data_zert = []
+
+        # KMAT data
+        self.df_kmat = None
+        self.inventur_data_kmat = []
+        self.not_found_data_kmat = []
 
     # ------------------------------------------------------------------
     # QR parsing
@@ -459,7 +916,7 @@ class InventurAppSK:
             }
 
     # ------------------------------------------------------------------
-    # Master table
+    # Master table (SK)
     # ------------------------------------------------------------------
 
     def load_arbeitstabelle(self):
@@ -490,7 +947,66 @@ class InventurAppSK:
             self.df_rollen = None
 
     # ------------------------------------------------------------------
-    # Charge lookup
+    # Master table (Zert)
+    # ------------------------------------------------------------------
+
+    def load_arbeitstabelle_zert(self):
+        """Load Zert master table from the configured path."""
+        if self.arbeitstabelle_zert_path is None or not self.arbeitstabelle_zert_path.exists():
+            self.df_zert = None
+            self.logger.warning("Zert master table not loaded")
+            return
+        try:
+            self.df_zert = pd.read_excel(self.arbeitstabelle_zert_path, dtype={"Charge": str})
+            if "Charge" in self.df_zert.columns:
+                self.df_zert["Charge"] = self.df_zert["Charge"].astype(str)
+            count = len(self.df_zert)
+            self.logger.info(f"Zert master table loaded: {count} rows")
+            self.status_var.set(f"Zert master table loaded: {count} entries")
+            self._update_header_info()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading Zert master table:\n{e}")
+            self.df_zert = None
+
+    # ------------------------------------------------------------------
+    # Master table (KMAT)
+    # ------------------------------------------------------------------
+
+    def load_arbeitstabelle_kmat(self):
+        """Load KMAT master table from the configured path."""
+        if self.arbeitstabelle_kmat_path is None or not self.arbeitstabelle_kmat_path.exists():
+            self.df_kmat = None
+            self.logger.warning("KMAT master table not loaded")
+            return
+        try:
+            self.df_kmat = pd.read_excel(self.arbeitstabelle_kmat_path, dtype=str)
+
+            def _norm_num(x):
+                if x is None:
+                    return ""
+                s = str(x).strip()
+                if s in ("", "nan"):
+                    return ""
+                try:
+                    return str(int(float(s)))
+                except (ValueError, TypeError):
+                    return ""
+
+            if "Kauf" in self.df_kmat.columns:
+                self.df_kmat["Kauf"] = self.df_kmat["Kauf"].apply(_norm_num)
+            if "POS" in self.df_kmat.columns:
+                self.df_kmat["POS"] = self.df_kmat["POS"].apply(_norm_num)
+
+            count = len(self.df_kmat)
+            self.logger.info(f"KMAT master table loaded: {count} rows")
+            self.status_var.set(f"KMAT master table loaded: {count} entries")
+            self._update_header_info()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading KMAT master table:\n{e}")
+            self.df_kmat = None
+
+    # ------------------------------------------------------------------
+    # Charge lookup (SK)
     # ------------------------------------------------------------------
 
     def suche_charge(self, charge):
@@ -503,44 +1019,159 @@ class InventurAppSK:
         return None
 
     # ------------------------------------------------------------------
+    # Charge lookup (Zert)
+    # ------------------------------------------------------------------
+
+    def suche_charge_zert(self, charge):
+        """Look up a charge in df_zert. Returns row dict or None."""
+        if self.df_zert is None:
+            return None
+        matches = self.df_zert[self.df_zert["Charge"] == str(charge)]
+        if not matches.empty:
+            return matches.iloc[0].to_dict()
+        return None
+
+    # ------------------------------------------------------------------
+    # Kauf+POS lookup (KMAT)
+    # ------------------------------------------------------------------
+
+    def suche_kmat(self, kauf, pos):
+        """Look up by Kauf + POS in df_kmat. Returns row dict or None."""
+        if self.df_kmat is None:
+            return None
+        # Normalize input
+        try:
+            kauf_norm = str(int(float(str(kauf).strip())))
+        except (ValueError, TypeError):
+            kauf_norm = str(kauf).strip()
+        try:
+            pos_norm = str(int(float(str(pos).strip())))
+        except (ValueError, TypeError):
+            pos_norm = str(pos).strip()
+        matches = self.df_kmat[
+            (self.df_kmat["Kauf"] == kauf_norm) &
+            (self.df_kmat["POS"] == pos_norm)
+        ]
+        if not matches.empty:
+            return matches.iloc[0].to_dict()
+        return None
+
+    def get_kmat_positions(self, kauf):
+        """Return list of available POS strings for a given Kaufnummer."""
+        if self.df_kmat is None:
+            return []
+        try:
+            kauf_norm = str(int(float(str(kauf).strip())))
+        except (ValueError, TypeError):
+            kauf_norm = str(kauf).strip()
+        rows = self.df_kmat[self.df_kmat["Kauf"] == kauf_norm]
+        return rows["POS"].tolist()
+
+    # ------------------------------------------------------------------
     # Startup path check
     # ------------------------------------------------------------------
 
     def check_paths_on_startup(self):
         """Show a warning / prompt to locate file if master path is not set."""
-        arb_missing = (
-            self.arbeitstabelle_path is None
-            or not self.arbeitstabelle_path.exists()
-        )
-
-        if arb_missing:
-            answer = messagebox.askyesno(
-                "Master Table Not Found",
-                "The master table file has not been configured or could not be found.\n\n"
-                "Would you like to locate it now?",
+        if self.warehouse_mode == "Zert":
+            arb_missing = (
+                self.arbeitstabelle_zert_path is None
+                or not self.arbeitstabelle_zert_path.exists()
             )
-            if answer:
-                path = filedialog.askopenfilename(
-                    title="Select Master Table file",
-                    filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
-                )
-                if path:
-                    self.config["arbeitstabelle_path"] = path
-                    self.save_config()
-                    self._resolve_paths()
-                    self.load_arbeitstabelle()
-                else:
-                    self._disable_scan("No master table selected. Scanning disabled.")
-            else:
-                self._disable_scan("Master table not configured. Scanning disabled.")
-        else:
-            self.load_arbeitstabelle()
 
-        # Default export path to base_dir if not set
-        if not self.config.get("export_path", ""):
-            self.config["export_path"] = str(self.base_dir)
-            self.save_config()
-            self._resolve_paths()
+            if arb_missing:
+                answer = messagebox.askyesno(
+                    "Zert Master Table Not Found",
+                    "The Zert master table has not been configured or could not be found.\n\n"
+                    "Search now?",
+                )
+                if answer:
+                    path = filedialog.askopenfilename(
+                        title="Select Zert Master Table",
+                        filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    )
+                    if path:
+                        self.config["arbeitstabelle_zert_path"] = path
+                        self.save_config()
+                        self._resolve_paths()
+                        self.load_arbeitstabelle_zert()
+                    else:
+                        self._disable_scan("No Zert master table selected. Scanning disabled.")
+                else:
+                    self._disable_scan("Zert master table not configured. Scanning disabled.")
+            else:
+                self.load_arbeitstabelle_zert()
+
+            # Default export zert path
+            if not self.config.get("export_zert_path", ""):
+                self.config["export_zert_path"] = str(self.base_dir)
+                self.save_config()
+                self._resolve_paths()
+        elif self.warehouse_mode == "KMAT":
+            arb_missing = (
+                self.arbeitstabelle_kmat_path is None
+                or not self.arbeitstabelle_kmat_path.exists()
+            )
+            if arb_missing:
+                answer = messagebox.askyesno(
+                    "KMAT Master Table Not Found",
+                    "The KMAT master table has not been configured or could not be found.\n\nSearch now?",
+                )
+                if answer:
+                    path = filedialog.askopenfilename(
+                        title="Select KMAT Master Table",
+                        filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    )
+                    if path:
+                        self.config["arbeitstabelle_kmat_path"] = path
+                        self.save_config()
+                        self._resolve_paths()
+                        self.load_arbeitstabelle_kmat()
+                    else:
+                        self._disable_scan("No KMAT master table selected. Scanning disabled.")
+                else:
+                    self._disable_scan("KMAT master table not configured. Scanning disabled.")
+            else:
+                self.load_arbeitstabelle_kmat()
+
+            if not self.config.get("export_kmat_path", ""):
+                self.config["export_kmat_path"] = str(self.base_dir)
+                self.save_config()
+                self._resolve_paths()
+        else:
+            arb_missing = (
+                self.arbeitstabelle_path is None
+                or not self.arbeitstabelle_path.exists()
+            )
+
+            if arb_missing:
+                answer = messagebox.askyesno(
+                    "Master Table Not Found",
+                    "The master table file has not been configured or could not be found.\n\n"
+                    "Would you like to locate it now?",
+                )
+                if answer:
+                    path = filedialog.askopenfilename(
+                        title="Select Master Table file",
+                        filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    )
+                    if path:
+                        self.config["arbeitstabelle_path"] = path
+                        self.save_config()
+                        self._resolve_paths()
+                        self.load_arbeitstabelle()
+                    else:
+                        self._disable_scan("No master table selected. Scanning disabled.")
+                else:
+                    self._disable_scan("Master table not configured. Scanning disabled.")
+            else:
+                self.load_arbeitstabelle()
+
+            # Default export path to base_dir if not set
+            if not self.config.get("export_path", ""):
+                self.config["export_path"] = str(self.base_dir)
+                self.save_config()
+                self._resolve_paths()
 
     def _disable_scan(self, msg):
         self.scan_entry.config(state="disabled")
@@ -560,8 +1191,15 @@ class InventurAppSK:
             self._resolve_paths()
             # Re-enable scan if it was disabled
             self.scan_entry.config(state="normal")
-            self.load_arbeitstabelle()
-            messagebox.showinfo("Settings Saved", "Settings have been saved.\nMaster table reloaded.")
+            if self.warehouse_mode == "Zert":
+                self.load_arbeitstabelle_zert()
+                messagebox.showinfo("Settings Saved", "Settings have been saved.\nZert master table reloaded.")
+            elif self.warehouse_mode == "KMAT":
+                self.load_arbeitstabelle_kmat()
+                messagebox.showinfo("Settings Saved", "Settings have been saved.\nKMAT master table reloaded.")
+            else:
+                self.load_arbeitstabelle()
+                messagebox.showinfo("Settings Saved", "Settings have been saved.\nMaster table reloaded.")
 
     # ------------------------------------------------------------------
     # UI construction
@@ -569,7 +1207,12 @@ class InventurAppSK:
 
     def setup_ui(self):
         """Build the main UI."""
-        self.root.title("INVENTORY Forbo SK - Malacky Warehouse Management")
+        if self.warehouse_mode == "Zert":
+            self.root.title("INVENTORY Forbo - Zert Warehouse")
+        elif self.warehouse_mode == "KMAT":
+            self.root.title("INVENTORY Forbo - KMAT Warehouse")
+        else:
+            self.root.title("INVENTORY Forbo SK - Malacky Warehouse Management")
         self.root.geometry("1280x820")
         self.root.configure(bg="#f0f0f0")
 
@@ -604,14 +1247,24 @@ class InventurAppSK:
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 16))
         header_frame.columnconfigure(1, weight=1)
 
+        if self.warehouse_mode == "Zert":
+            fg_color = "#375623"
+            header_text = "INVENTORY Forbo - Zert Warehouse"
+        elif self.warehouse_mode == "KMAT":
+            fg_color = "#6b1f1f"
+            header_text = "INVENTORY Forbo - KMAT Warehouse"
+        else:
+            fg_color = "#1f4e79"
+            header_text = "INVENTORY Forbo SK - Malacky Warehouse Management"
+
         ttk.Label(header_frame, text="[F]", font=("Arial", 20, "bold"),
-                  foreground="#1f4e79").grid(row=0, column=0, padx=(0, 16))
+                  foreground=fg_color).grid(row=0, column=0, padx=(0, 16))
 
         ttk.Label(
             header_frame,
-            text="INVENTORY Forbo SK - Malacky Warehouse Management",
+            text=header_text,
             font=("Arial", 18, "bold"),
-            foreground="#1f4e79",
+            foreground=fg_color,
         ).grid(row=0, column=1, sticky=tk.W)
 
         self.header_info_var = tk.StringVar(value="No master table loaded")
@@ -619,10 +1272,21 @@ class InventurAppSK:
                   font=("Arial", 10)).grid(row=0, column=2, padx=(20, 0))
 
     def _update_header_info(self):
-        if self.df_rollen is not None:
-            self.header_info_var.set(f"DB: {len(self.df_rollen)} rolls in master table")
+        if self.warehouse_mode == "Zert":
+            if self.df_zert is not None:
+                self.header_info_var.set(f"DB: {len(self.df_zert)} entries in Zert master table")
+            else:
+                self.header_info_var.set("No Zert master table loaded")
+        elif self.warehouse_mode == "KMAT":
+            if self.df_kmat is not None:
+                self.header_info_var.set(f"DB: {len(self.df_kmat)} entries in KMAT master table")
+            else:
+                self.header_info_var.set("No KMAT master table loaded")
         else:
-            self.header_info_var.set("No master table loaded")
+            if self.df_rollen is not None:
+                self.header_info_var.set(f"DB: {len(self.df_rollen)} rolls in master table")
+            else:
+                self.header_info_var.set("No master table loaded")
 
     # --- Scan section ---
 
@@ -658,11 +1322,15 @@ class InventurAppSK:
 
         self._create_display_labels()
         self._create_input_panel()
+        self._create_zert_info_panel()
+        self._create_zert_input_panel()
+        self._create_kmat_info_panel()
+        self._create_kmat_input_panel()
 
         self.current_frame.grid_remove()
 
     def _create_display_labels(self):
-        """Create read-only display labels for scan data."""
+        """Create read-only display labels for SK scan data."""
         # Row 0: Batch No. | Material
         ttk.Label(self.current_frame, text="Batch No.:", font=("Arial", 11, "bold")).grid(
             row=0, column=0, sticky=tk.W, pady=2)
@@ -709,57 +1377,57 @@ class InventurAppSK:
         self.lbl_frei.grid(row=4, column=1, sticky=tk.W, padx=(8, 0), pady=2)
 
         # Row 5: Dimensions grid
-        dim_frame = ttk.LabelFrame(self.current_frame, text="Dimensions (mm)", padding="6")
-        dim_frame.grid(row=5, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(8, 4))
-        dim_frame.columnconfigure(1, weight=1)
-        dim_frame.columnconfigure(3, weight=1)
-        dim_frame.columnconfigure(5, weight=1)
+        self.dim_frame = ttk.LabelFrame(self.current_frame, text="Dimensions (mm)", padding="6")
+        self.dim_frame.grid(row=5, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(8, 4))
+        self.dim_frame.columnconfigure(1, weight=1)
+        self.dim_frame.columnconfigure(3, weight=1)
+        self.dim_frame.columnconfigure(5, weight=1)
 
-        ttk.Label(dim_frame, text="Stage 0", font=("Arial", 10, "bold")).grid(
+        ttk.Label(self.dim_frame, text="Stage 0", font=("Arial", 10, "bold")).grid(
             row=0, column=0, columnspan=2, sticky=tk.W, padx=(0, 16))
-        ttk.Label(dim_frame, text="Stage 1", font=("Arial", 10, "bold")).grid(
+        ttk.Label(self.dim_frame, text="Stage 1", font=("Arial", 10, "bold")).grid(
             row=0, column=2, columnspan=2, sticky=tk.W, padx=(0, 16))
-        ttk.Label(dim_frame, text="Stage 2", font=("Arial", 10, "bold")).grid(
+        ttk.Label(self.dim_frame, text="Stage 2", font=("Arial", 10, "bold")).grid(
             row=0, column=4, columnspan=2, sticky=tk.W)
 
         # Stage 0
-        ttk.Label(dim_frame, text="Length:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Length:", font=("Arial", 9)).grid(
             row=1, column=0, sticky=tk.W, padx=(0, 4))
-        self.lbl_lnge0 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_lnge0 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_lnge0.grid(row=1, column=1, sticky=tk.W, padx=(0, 16))
 
         # Stage 1
-        ttk.Label(dim_frame, text="Length:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Length:", font=("Arial", 9)).grid(
             row=1, column=2, sticky=tk.W, padx=(0, 4))
-        self.lbl_lnge1 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_lnge1 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_lnge1.grid(row=1, column=3, sticky=tk.W, padx=(0, 16))
 
         # Stage 2
-        ttk.Label(dim_frame, text="Length:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Length:", font=("Arial", 9)).grid(
             row=1, column=4, sticky=tk.W, padx=(0, 4))
-        self.lbl_lnge2 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_lnge2 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_lnge2.grid(row=1, column=5, sticky=tk.W)
 
-        ttk.Label(dim_frame, text="Width:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Width:", font=("Arial", 9)).grid(
             row=2, column=0, sticky=tk.W, padx=(0, 4))
-        self.lbl_brte0 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_brte0 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_brte0.grid(row=2, column=1, sticky=tk.W, padx=(0, 16))
 
-        ttk.Label(dim_frame, text="Width:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Width:", font=("Arial", 9)).grid(
             row=2, column=2, sticky=tk.W, padx=(0, 4))
-        self.lbl_brte1 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_brte1 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_brte1.grid(row=2, column=3, sticky=tk.W, padx=(0, 16))
 
-        ttk.Label(dim_frame, text="Width:", font=("Arial", 9)).grid(
+        ttk.Label(self.dim_frame, text="Width:", font=("Arial", 9)).grid(
             row=2, column=4, sticky=tk.W, padx=(0, 4))
-        self.lbl_brte2 = ttk.Label(dim_frame, text="", font=("Arial", 10, "bold"), width=8)
+        self.lbl_brte2 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_brte2.grid(row=2, column=5, sticky=tk.W)
 
-        ttk.Separator(self.current_frame, orient="horizontal").grid(
-            row=6, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=8)
+        self.sk_separator = ttk.Separator(self.current_frame, orient="horizontal")
+        self.sk_separator.grid(row=6, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=8)
 
     def _create_input_panel(self):
-        """Create user input widgets (Fach + Measured Width + Remarks)."""
+        """Create user input widgets for SK (Fach + Measured Width + Remarks)."""
         self.fach_var = tk.StringVar()
         self.brte_meas_var = tk.StringVar()
         self.remarks_var = tk.StringVar()
@@ -806,10 +1474,201 @@ class InventurAppSK:
         save_btn.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.input_widgets["save_button"] = save_btn
 
+    def _create_zert_info_panel(self):
+        """Create info display panel for Zert mode (initially hidden)."""
+        self.zert_info_container = ttk.LabelFrame(
+            self.current_frame, text="Zert Charge Info", padding="8")
+        # Don't grid yet — shown on demand
+
+        self.zert_info_container.columnconfigure(1, weight=1)
+        self.zert_info_container.columnconfigure(3, weight=1)
+
+        # Labels for Zert info fields
+        fields_left = [
+            ("Charge:", "zert_lbl_charge"),
+            ("Material No.:", "zert_lbl_material"),
+            ("Description:", "zert_lbl_kurztext"),
+            ("Mat. Type:", "zert_lbl_mart"),
+            ("Plant:", "zert_lbl_werk"),
+            ("Location:", "zert_lbl_lort"),
+        ]
+        fields_right = [
+            ("UOM:", "zert_lbl_bme"),
+            ("Free Usable:", "zert_lbl_frei"),
+            ("Length (mm):", "zert_lbl_laenge"),
+            ("Width (mm):", "zert_lbl_breite"),
+            ("ADV:", "zert_lbl_adv"),
+        ]
+
+        for r, (lbl_text, attr) in enumerate(fields_left):
+            ttk.Label(self.zert_info_container, text=lbl_text,
+                      font=("Arial", 10, "bold")).grid(row=r, column=0, sticky=tk.W, pady=2, padx=(0, 6))
+            lbl = ttk.Label(self.zert_info_container, text="", font=("Arial", 10))
+            lbl.grid(row=r, column=1, sticky=tk.W, padx=(0, 20), pady=2)
+            setattr(self, attr, lbl)
+
+        for r, (lbl_text, attr) in enumerate(fields_right):
+            ttk.Label(self.zert_info_container, text=lbl_text,
+                      font=("Arial", 10, "bold")).grid(row=r, column=2, sticky=tk.W, pady=2, padx=(0, 6))
+            lbl = ttk.Label(self.zert_info_container, text="", font=("Arial", 10))
+            lbl.grid(row=r, column=3, sticky=tk.W, pady=2)
+            setattr(self, attr, lbl)
+
+    def _create_zert_input_panel(self):
+        """Create input panel for Zert mode: only Recorded Quantity."""
+        self.zert_input_container = ttk.Frame(self.current_frame)
+        # Don't grid yet — shown on demand
+
+        self.menge_var = tk.StringVar()
+        self.zert_remarks_var = tk.StringVar()
+        self.zert_input_widgets = {}
+
+        self.zert_input_container.columnconfigure(1, weight=1)
+
+        ttk.Label(self.zert_input_container, text="Recorded Quantity *:",
+                  font=("Arial", 11, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+        entry_menge = ttk.Entry(self.zert_input_container, textvariable=self.menge_var,
+                                font=("Arial", 12), width=15)
+        entry_menge.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_menge.bind("<Return>", self.save_current_scan_zert)
+        self.zert_input_widgets["menge_entry"] = entry_menge
+
+        self.zert_lbl_bme_input = ttk.Label(self.zert_input_container, text="",
+                                             font=("Arial", 10), foreground="gray")
+        self.zert_lbl_bme_input.grid(row=0, column=2, sticky=tk.W, padx=(8, 0), pady=5)
+
+        ttk.Label(self.zert_input_container, text="Remarks:",
+                  font=("Arial", 11, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+        entry_zert_remarks = ttk.Entry(self.zert_input_container, textvariable=self.zert_remarks_var,
+                                        font=("Arial", 12), width=40)
+        entry_zert_remarks.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_zert_remarks.bind("<Return>", self.save_current_scan_zert)
+        self.zert_input_widgets["remarks_entry"] = entry_zert_remarks
+
+        save_btn = ttk.Button(self.zert_input_container, text="Save",
+                               command=self.save_current_scan_zert)
+        save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
+        self.zert_input_widgets["save_button"] = save_btn
+
+    def _create_kmat_info_panel(self):
+        """Create info display panel for KMAT mode (initially hidden)."""
+        self.kmat_info_container = ttk.LabelFrame(
+            self.current_frame, text="KMAT Info", padding="8")
+
+        self.kmat_info_container.columnconfigure(1, weight=1)
+        self.kmat_info_container.columnconfigure(3, weight=1)
+
+        fields_left = [
+            ("Kauf-Nr.:", "kmat_lbl_kauf"),
+            ("POS:", "kmat_lbl_pos"),
+            ("Material No.:", "kmat_lbl_material"),
+            ("Description:", "kmat_lbl_kurztext"),
+        ]
+        fields_right = [
+            ("Plant:", "kmat_lbl_werk"),
+            ("Location:", "kmat_lbl_lort"),
+            ("UOM:", "kmat_lbl_bme"),
+            ("Free Usable:", "kmat_lbl_frei"),
+        ]
+
+        for r, (lbl_text, attr) in enumerate(fields_left):
+            ttk.Label(self.kmat_info_container, text=lbl_text,
+                      font=("Arial", 10, "bold")).grid(row=r, column=0, sticky=tk.W, pady=2, padx=(0, 6))
+            lbl = ttk.Label(self.kmat_info_container, text="", font=("Arial", 10))
+            lbl.grid(row=r, column=1, sticky=tk.W, padx=(0, 20), pady=2)
+            setattr(self, attr, lbl)
+
+        for r, (lbl_text, attr) in enumerate(fields_right):
+            ttk.Label(self.kmat_info_container, text=lbl_text,
+                      font=("Arial", 10, "bold")).grid(row=r, column=2, sticky=tk.W, pady=2, padx=(0, 6))
+            lbl = ttk.Label(self.kmat_info_container, text="", font=("Arial", 10))
+            lbl.grid(row=r, column=3, sticky=tk.W, pady=2)
+            setattr(self, attr, lbl)
+
+    def _create_kmat_input_panel(self):
+        """Create input panel for KMAT mode."""
+        self.kmat_input_container = ttk.Frame(self.current_frame)
+
+        self.kmat_menge_var = tk.StringVar()
+        self.kmat_remarks_var = tk.StringVar()
+        self.kmat_input_widgets = {}
+
+        self.kmat_input_container.columnconfigure(1, weight=1)
+
+        ttk.Label(self.kmat_input_container, text="Recorded Quantity *:",
+                  font=("Arial", 11, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+        entry_menge = ttk.Entry(self.kmat_input_container, textvariable=self.kmat_menge_var,
+                                font=("Arial", 12), width=15)
+        entry_menge.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_menge.bind("<Return>", self.save_current_scan_kmat)
+        self.kmat_input_widgets["menge_entry"] = entry_menge
+
+        self.kmat_lbl_bme_input = ttk.Label(self.kmat_input_container, text="",
+                                             font=("Arial", 10), foreground="gray")
+        self.kmat_lbl_bme_input.grid(row=0, column=2, sticky=tk.W, padx=(8, 0), pady=5)
+
+        ttk.Label(self.kmat_input_container, text="Remarks:",
+                  font=("Arial", 11, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+        entry_remarks = ttk.Entry(self.kmat_input_container, textvariable=self.kmat_remarks_var,
+                                  font=("Arial", 12), width=40)
+        entry_remarks.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_remarks.bind("<Return>", self.save_current_scan_kmat)
+        self.kmat_input_widgets["remarks_entry"] = entry_remarks
+
+        save_btn = ttk.Button(self.kmat_input_container, text="Save",
+                               command=self.save_current_scan_kmat)
+        save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
+        self.kmat_input_widgets["save_button"] = save_btn
+
+    def _show_sk_widgets(self):
+        """Show SK-specific widgets, hide Zert and KMAT widgets."""
+        # Show SK rows 0-7
+        for r in range(8):
+            for widget in self.current_frame.grid_slaves(row=r):
+                widget.grid()
+        self.dim_frame.grid()
+        self.sk_separator.grid()
+        self.input_container.grid()
+        # Hide Zert containers
+        self.zert_info_container.grid_remove()
+        self.zert_input_container.grid_remove()
+        # Hide KMAT containers
+        self.kmat_info_container.grid_remove()
+        self.kmat_input_container.grid_remove()
+
+    def _show_zert_widgets(self):
+        """Show Zert-specific widgets, hide SK and KMAT widgets."""
+        # Hide all SK-specific widgets (rows 0-7 labels + dim_frame + separator + input_container)
+        for widget in self.current_frame.grid_slaves():
+            widget.grid_remove()
+
+        # Show Zert containers
+        self.zert_info_container.grid(row=0, column=0, columnspan=4,
+                                       sticky=(tk.W, tk.E), pady=(0, 8))
+        self.zert_input_container.grid(row=1, column=0, columnspan=4,
+                                        sticky=(tk.W, tk.E), pady=4)
+
+    def _show_kmat_widgets(self):
+        """Show KMAT-specific widgets, hide SK and Zert widgets."""
+        for widget in self.current_frame.grid_slaves():
+            widget.grid_remove()
+        self.kmat_info_container.grid(row=0, column=0, columnspan=4,
+                                       sticky=(tk.W, tk.E), pady=(0, 8))
+        self.kmat_input_container.grid(row=1, column=0, columnspan=4,
+                                        sticky=(tk.W, tk.E), pady=4)
+
+    def _hide_all_scan_widgets(self):
+        """Hide all scan detail widgets."""
+        self.zert_info_container.grid_remove()
+        self.zert_input_container.grid_remove()
+        self.kmat_info_container.grid_remove()
+        self.kmat_input_container.grid_remove()
+        self.input_container.grid_remove()
+
     # --- List section ---
 
     def create_list_section(self):
-        list_frame = ttk.LabelFrame(self.main_frame, text="SCANNED ROLLS", padding="10")
+        list_frame = ttk.LabelFrame(self.main_frame, text="SCANNED ITEMS", padding="10")
         list_frame.grid(row=3, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(1, weight=1)
@@ -818,20 +1677,44 @@ class InventurAppSK:
         count_frame = ttk.Frame(list_frame)
         count_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 8))
 
-        self.count_label = ttk.Label(count_frame, text="0 rolls", font=("Arial", 12, "bold"))
+        self.count_label = ttk.Label(count_frame, text="0 items", font=("Arial", 12, "bold"))
         self.count_label.pack(side=tk.LEFT)
 
-        columns = ("Time", "Batch No.", "Material", "Shelf Location", "Status")
+        if self.warehouse_mode == "Zert":
+            columns = ("Time", "Charge", "Material No.", "Description", "Quantity", "UOM", "Status")
+        elif self.warehouse_mode == "KMAT":
+            columns = ("Time", "Kauf-Nr.", "POS", "Material No.", "Description", "Quantity", "UOM", "Status")
+        else:
+            columns = ("Time", "Batch No.", "Material", "Shelf Location", "Status")
+
         self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=12)
 
         for col in columns:
             self.tree.heading(col, text=col)
 
-        self.tree.column("Time", width=90, minwidth=70)
-        self.tree.column("Batch No.", width=130, minwidth=100)
-        self.tree.column("Material", width=110, minwidth=80)
-        self.tree.column("Shelf Location", width=100, minwidth=70)
-        self.tree.column("Status", width=130, minwidth=100)
+        if self.warehouse_mode == "Zert":
+            self.tree.column("Time", width=90, minwidth=70)
+            self.tree.column("Charge", width=130, minwidth=100)
+            self.tree.column("Material No.", width=110, minwidth=80)
+            self.tree.column("Description", width=200, minwidth=120)
+            self.tree.column("Quantity", width=80, minwidth=60)
+            self.tree.column("UOM", width=60, minwidth=50)
+            self.tree.column("Status", width=100, minwidth=80)
+        elif self.warehouse_mode == "KMAT":
+            self.tree.column("Time", width=80, minwidth=70)
+            self.tree.column("Kauf-Nr.", width=110, minwidth=80)
+            self.tree.column("POS", width=50, minwidth=40)
+            self.tree.column("Material No.", width=100, minwidth=80)
+            self.tree.column("Description", width=200, minwidth=120)
+            self.tree.column("Quantity", width=80, minwidth=60)
+            self.tree.column("UOM", width=60, minwidth=50)
+            self.tree.column("Status", width=80, minwidth=60)
+        else:
+            self.tree.column("Time", width=90, minwidth=70)
+            self.tree.column("Batch No.", width=130, minwidth=100)
+            self.tree.column("Material", width=110, minwidth=80)
+            self.tree.column("Shelf Location", width=100, minwidth=70)
+            self.tree.column("Status", width=130, minwidth=100)
 
         self.tree.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
@@ -909,25 +1792,81 @@ class InventurAppSK:
             self._reset_scan()
             return
 
-        row_data = self.suche_charge(charge)
+        if self.warehouse_mode == "Zert":
+            row_data = self.suche_charge_zert(charge)
+            if row_data is not None:
+                self.show_found_zert(row_data, charge)
+            else:
+                self.show_not_found_dialog_zert(charge)
+        elif self.warehouse_mode == "KMAT":
+            kauf = raw.strip()
 
-        if row_data is not None:
-            self.show_found_rolle(row_data, qr)
+            # Check if Kaufnummer exists at all
+            positions = self.get_kmat_positions(kauf)
+            if not positions:
+                messagebox.showerror(
+                    "Kundenauftrag Not Found",
+                    f"Kundenauftrag '{kauf}' was not found in the master table.",
+                )
+                self._reset_scan()
+                return
+
+            # Ask user to select position
+            pos_dlg = PositionInputDialog(self.root, kauf, positions)
+            if pos_dlg.result is None:
+                self._reset_scan()
+                return
+            pos = pos_dlg.result
+
+            # Duplicate check
+            combo_key = f"{kauf}#{pos}"
+            already = False
+            for item in self.inventur_data_kmat + self.not_found_data_kmat:
+                if f"{item.get('kauf', '')}#{item.get('pos', '')}" == combo_key:
+                    already = True
+                    break
+            if already:
+                messagebox.showwarning(
+                    "Already Scanned",
+                    f"Kauf-Nr. '{kauf}' / POS '{pos}' has already been scanned!",
+                )
+                self._reset_scan()
+                return
+
+            row_data = self.suche_kmat(kauf, pos)
+            if row_data is not None:
+                self.show_found_kmat(row_data, kauf, pos)
+            else:
+                messagebox.showerror(
+                    "Position Not Found",
+                    f"Position '{pos}' for Kundenauftrag '{kauf}' was not found.",
+                )
+                self._reset_scan()
         else:
-            self.show_not_found_dialog(charge, qr)
+            row_data = self.suche_charge(charge)
+            if row_data is not None:
+                self.show_found_rolle(row_data, qr)
+            else:
+                self.show_not_found_dialog(charge, qr)
 
     def _is_already_scanned(self, charge):
-        for item in self.inventur_data + self.not_found_data:
-            if str(item.get("charge", "")) == str(charge):
-                return True
-        return False
+        if self.warehouse_mode == "Zert":
+            for item in self.inventur_data_zert + self.not_found_data_zert:
+                if str(item.get("charge", "")) == str(charge):
+                    return True
+            return False
+        else:
+            for item in self.inventur_data + self.not_found_data:
+                if str(item.get("charge", "")) == str(charge):
+                    return True
+            return False
 
     # ------------------------------------------------------------------
-    # Show found roll
+    # Show found roll (SK)
     # ------------------------------------------------------------------
 
     def show_found_rolle(self, row_data, qr):
-        """Display found roll data and show the input panel."""
+        """Display found roll data and show the input panel (SK mode)."""
         def _fmt_int(val):
             """Format numeric value as integer string (remove .0)."""
             if val == "" or val is None:
@@ -993,6 +1932,7 @@ class InventurAppSK:
 
         self.current_frame.config(text="ROLL FOUND")
         self.current_frame.grid()
+        self._show_sk_widgets()
 
         # Reset input fields
         self.fach_var.set("")
@@ -1004,11 +1944,113 @@ class InventurAppSK:
         self.status_var.set(f"Roll found: {self.current_scan['kurztext']} | Enter Shelf Location")
 
     # ------------------------------------------------------------------
-    # Not found dialog
+    # Show found Zert charge
+    # ------------------------------------------------------------------
+
+    def show_found_zert(self, row_data, charge):
+        """Display found Zert charge data and show Zert input panel."""
+        def _s(val):
+            if val is None:
+                return ""
+            s = str(val)
+            return "" if s.lower() == "nan" else s
+
+        self.current_scan = {
+            "charge": charge,
+            "material": _s(row_data.get("Material", "") or _s(row_data.get("Materialnummer", ""))),
+            "kurztext": _s(row_data.get("Materialkurztext", "")),
+            "mart": _s(row_data.get("MArt", "")),
+            "werk": _s(row_data.get("Werk", "")),
+            "lort": _s(row_data.get("Lagerort", "") or _s(row_data.get("LOrt", ""))),
+            "bme": _s(row_data.get("BME", "") or _s(row_data.get("Basismengeneinheit", ""))),
+            "frei_verw": _s(row_data.get("Frei verwendbar", "")),
+            "laenge_mm": _s(row_data.get("Länge", "") or _s(row_data.get("Länge (mm)", "") or _s(row_data.get("Laenge mm", "")))),
+            "breite_mm": _s(row_data.get("Breite", "") or _s(row_data.get("Breite (mm)", "") or _s(row_data.get("Breite mm", "")))),
+            "adv": _s(row_data.get("ADV", "")),
+            "status": "found",
+            "_mode": "zert",
+        }
+
+        # Update Zert info labels
+        self.zert_lbl_charge.config(text=self.current_scan["charge"])
+        self.zert_lbl_material.config(text=self.current_scan["material"])
+        self.zert_lbl_kurztext.config(text=self.current_scan["kurztext"])
+        self.zert_lbl_mart.config(text=self.current_scan["mart"])
+        self.zert_lbl_werk.config(text=self.current_scan["werk"])
+        self.zert_lbl_lort.config(text=self.current_scan["lort"])
+        self.zert_lbl_bme.config(text=self.current_scan["bme"])
+        self.zert_lbl_frei.config(text=self.current_scan["frei_verw"])
+        self.zert_lbl_laenge.config(text=self.current_scan["laenge_mm"])
+        self.zert_lbl_breite.config(text=self.current_scan["breite_mm"])
+        self.zert_lbl_adv.config(text=self.current_scan["adv"])
+        # Show BME hint next to menge entry
+        self.zert_lbl_bme_input.config(text=self.current_scan["bme"])
+
+        self.current_frame.config(text="CHARGE FOUND (Zert)")
+        self.current_frame.grid()
+        self._show_zert_widgets()
+
+        # Reset Zert input fields
+        self.menge_var.set("")
+        self.zert_remarks_var.set("")
+        self.zert_input_widgets["menge_entry"].focus_set()
+
+        self.scan_var.set("")
+        self.status_var.set(
+            f"Charge found: {self.current_scan['kurztext']} | Enter quantity")
+
+    # ------------------------------------------------------------------
+    # Show found KMAT item
+    # ------------------------------------------------------------------
+
+    def show_found_kmat(self, row_data, kauf, pos):
+        """Display found KMAT data and show KMAT input panel."""
+        def _s(val):
+            if val is None:
+                return ""
+            s = str(val)
+            return "" if s.lower() == "nan" else s
+
+        self.current_scan = {
+            "kauf": kauf,
+            "pos": pos,
+            "material": _s(row_data.get("Materialnummer", "")),
+            "kurztext": _s(row_data.get("Materialkurztext", "")),
+            "werk": _s(row_data.get("Werk", "")),
+            "lort": _s(row_data.get("Lagerort", "")),
+            "bme": _s(row_data.get("BME", "")),
+            "frei_verw": _s(row_data.get("Frei verwendbar", "")),
+            "status": "found",
+            "_mode": "kmat",
+        }
+
+        self.kmat_lbl_kauf.config(text=self.current_scan["kauf"])
+        self.kmat_lbl_pos.config(text=self.current_scan["pos"])
+        self.kmat_lbl_material.config(text=self.current_scan["material"])
+        self.kmat_lbl_kurztext.config(text=self.current_scan["kurztext"])
+        self.kmat_lbl_werk.config(text=self.current_scan["werk"])
+        self.kmat_lbl_lort.config(text=self.current_scan["lort"])
+        self.kmat_lbl_bme.config(text=self.current_scan["bme"])
+        self.kmat_lbl_frei.config(text=self.current_scan["frei_verw"])
+        self.kmat_lbl_bme_input.config(text=self.current_scan["bme"])
+
+        self.current_frame.config(text="KMAT FOUND")
+        self.current_frame.grid()
+        self._show_kmat_widgets()
+
+        self.kmat_menge_var.set("")
+        self.kmat_remarks_var.set("")
+        self.kmat_input_widgets["menge_entry"].focus_set()
+
+        self.scan_var.set("")
+        self.status_var.set(f"KMAT found: {self.current_scan['kurztext']} | Enter quantity")
+
+    # ------------------------------------------------------------------
+    # Not found dialog (SK)
     # ------------------------------------------------------------------
 
     def show_not_found_dialog(self, charge, qr):
-        """Show dialog for rolls not in master table."""
+        """Show dialog for rolls not in master table (SK)."""
         dlg = NotFoundDialogSK(self.root, charge, qr)
 
         if dlg.result:
@@ -1037,11 +2079,77 @@ class InventurAppSK:
         self._reset_scan()
 
     # ------------------------------------------------------------------
-    # Save current scan
+    # Not found dialog (Zert)
+    # ------------------------------------------------------------------
+
+    def show_not_found_dialog_zert(self, charge):
+        """Show dialog for Zert charges not in master table."""
+        dlg = NotFoundDialogZert(self.root, charge)
+
+        if dlg.result:
+            data = dlg.result.copy()
+            data["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+            self.not_found_data_zert.append(data)
+
+            self.undo_stack.append(("add_not_found_zert", data.copy()))
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+
+            if self.config.get("auto_save", True):
+                self.save_zert_excel()
+
+            self.update_list()
+            total = len(self.inventur_data_zert) + len(self.not_found_data_zert)
+            self.status_var.set(
+                f"Not-found charge saved. Total: {total} "
+                f"({len(self.inventur_data_zert)} found, {len(self.not_found_data_zert)} not found)"
+            )
+            self.logger.info(f"Not-found Zert charge saved: {data['charge']}")
+        else:
+            self.logger.info("Zert not-found dialog cancelled")
+
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
+    # Not found dialog (KMAT)
+    # ------------------------------------------------------------------
+
+    def show_not_found_dialog_kmat(self, kauf, pos):
+        """Show dialog for KMAT Kauf+POS not in master table."""
+        dlg = NotFoundDialogKMAT(self.root, kauf, pos)
+
+        if dlg.result:
+            data = dlg.result.copy()
+            data["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+            self.not_found_data_kmat.append(data)
+
+            self.undo_stack.append(("add_not_found_kmat", data.copy()))
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+
+            if self.config.get("auto_save", True):
+                self.save_kmat_excel()
+
+            self.update_list()
+            total = len(self.inventur_data_kmat) + len(self.not_found_data_kmat)
+            self.status_var.set(
+                f"Not-found KMAT saved. Total: {total} "
+                f"({len(self.inventur_data_kmat)} found, {len(self.not_found_data_kmat)} not found)"
+            )
+            self.logger.info(f"Not-found KMAT saved: {data['kauf']}/{data['pos']}")
+        else:
+            self.logger.info("KMAT not-found dialog cancelled")
+
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
+    # Save current scan (SK)
     # ------------------------------------------------------------------
 
     def save_current_scan(self, event=None):
-        """Validate and save the current found roll."""
+        """Validate and save the current found roll (SK)."""
         if not self.current_scan:
             return
 
@@ -1089,6 +2197,100 @@ class InventurAppSK:
         self._reset_scan()
 
     # ------------------------------------------------------------------
+    # Save current scan (Zert)
+    # ------------------------------------------------------------------
+
+    def save_current_scan_zert(self, event=None):
+        """Validate and save the current found Zert charge."""
+        if not self.current_scan:
+            return
+
+        menge = self.menge_var.get().strip()
+        if not menge:
+            messagebox.showwarning(
+                "Required Field",
+                "Recorded Quantity is a required field.",
+            )
+            self.zert_input_widgets["menge_entry"].focus_set()
+            return
+
+        # Validate numeric
+        try:
+            float(menge.replace(",", "."))
+        except ValueError:
+            messagebox.showwarning(
+                "Invalid Input",
+                "Recorded Quantity must be a number.",
+            )
+            self.zert_input_widgets["menge_entry"].focus_set()
+            return
+
+        self.current_scan["menge"] = menge
+        self.current_scan["remarks"] = self.zert_remarks_var.get().strip()
+        self.current_scan["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+        self.inventur_data_zert.append(self.current_scan.copy())
+
+        self.undo_stack.append(("add_found_zert", self.current_scan.copy()))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+
+        if self.config.get("auto_save", True):
+            self.save_zert_excel()
+
+        self.update_list()
+
+        total = len(self.inventur_data_zert) + len(self.not_found_data_zert)
+        self.status_var.set(
+            f"Charge saved. Total: {total} "
+            f"({len(self.inventur_data_zert)} found, {len(self.not_found_data_zert)} not found)"
+        )
+        self.logger.info(f"Zert charge saved: {self.current_scan['charge']}")
+
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
+    # Save current scan (KMAT)
+    # ------------------------------------------------------------------
+
+    def save_current_scan_kmat(self, event=None):
+        """Validate and save the current found KMAT item."""
+        if not self.current_scan or self.current_scan.get("_mode") != "kmat":
+            return
+
+        menge = self.kmat_menge_var.get().strip()
+        if not menge:
+            messagebox.showwarning("Required Field", "Recorded Quantity is mandatory.")
+            self.kmat_input_widgets["menge_entry"].focus_set()
+            return
+
+        self.current_scan["menge"] = menge
+        self.current_scan["remarks"] = self.kmat_remarks_var.get().strip()
+        self.current_scan["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+        self.inventur_data_kmat.append(self.current_scan.copy())
+
+        self.undo_stack.append(("add_kmat", self.current_scan.copy()))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+
+        if self.config.get("auto_save", True):
+            self.save_kmat_excel()
+
+        self.update_list()
+        total = len(self.inventur_data_kmat) + len(self.not_found_data_kmat)
+        self.status_var.set(
+            f"KMAT saved. Total: {total} "
+            f"({len(self.inventur_data_kmat)} found, {len(self.not_found_data_kmat)} not found)"
+        )
+        self.logger.info(f"KMAT scan saved: {self.current_scan['kauf']}/{self.current_scan['pos']}")
+
+        self.current_frame.grid_remove()
+        self._hide_all_scan_widgets()
+        self.current_scan = None
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
     # Reset scan
     # ------------------------------------------------------------------
 
@@ -1099,6 +2301,14 @@ class InventurAppSK:
         self.fach_var.set("")
         self.brte_meas_var.set("")
         self.remarks_var.set("")
+        if hasattr(self, "menge_var"):
+            self.menge_var.set("")
+        if hasattr(self, "zert_remarks_var"):
+            self.zert_remarks_var.set("")
+        if hasattr(self, "kmat_menge_var"):
+            self.kmat_menge_var.set("")
+        if hasattr(self, "kmat_remarks_var"):
+            self.kmat_remarks_var.set("")
         self.current_frame.grid_remove()
         self.scan_entry.focus_set()
         self.status_var.set("Ready to scan...")
@@ -1111,40 +2321,102 @@ class InventurAppSK:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        all_items = []
-        for d in self.inventur_data:
-            all_items.append((d, "Found"))
-        for d in self.not_found_data:
-            all_items.append((d, "Not Found"))
+        if self.warehouse_mode == "Zert":
+            all_items = []
+            for d in self.inventur_data_zert:
+                all_items.append((d, "Found"))
+            for d in self.not_found_data_zert:
+                all_items.append((d, "Not Found"))
 
-        all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
 
-        for d, status in all_items:
-            ts = d.get("zeitstempel", "")
-            time_part = ts.split(" ")[1] if " " in ts else ts
-            item_id = self.tree.insert(
-                "", "end",
-                values=(
-                    time_part,
-                    d.get("charge", ""),
-                    d.get("material", ""),
-                    d.get("fach", ""),
-                    status,
-                ),
+            for d, status in all_items:
+                ts = d.get("zeitstempel", "")
+                time_part = ts.split(" ")[1] if " " in ts else ts
+                self.tree.insert(
+                    "", "end",
+                    values=(
+                        time_part,
+                        d.get("charge", ""),
+                        d.get("material", ""),
+                        d.get("kurztext", ""),
+                        d.get("menge", ""),
+                        d.get("bme", ""),
+                        status,
+                    ),
+                )
+
+            total = len(self.inventur_data_zert) + len(self.not_found_data_zert)
+            self.count_label.config(
+                text=f"{total} entries ({len(self.inventur_data_zert)} found, "
+                     f"{len(self.not_found_data_zert)} not found)"
             )
-            if status == "Not Found":
-                self.tree.set(item_id, "Status", "NOT FOUND")
-            else:
-                self.tree.set(item_id, "Status", "Found")
+        elif self.warehouse_mode == "KMAT":
+            all_items = []
+            for d in self.inventur_data_kmat:
+                all_items.append((d, "Found"))
+            for d in self.not_found_data_kmat:
+                all_items.append((d, "Not Found"))
 
-        total = len(self.inventur_data) + len(self.not_found_data)
-        self.count_label.config(
-            text=f"{total} rolls ({len(self.inventur_data)} found, "
-                 f"{len(self.not_found_data)} not found)"
-        )
+            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+
+            for d, status in all_items:
+                ts = d.get("zeitstempel", "")
+                time_part = ts.split(" ")[1] if " " in ts else ts
+                self.tree.insert(
+                    "", "end",
+                    values=(
+                        time_part,
+                        d.get("kauf", ""),
+                        d.get("pos", ""),
+                        d.get("material", ""),
+                        d.get("kurztext", ""),
+                        d.get("menge", ""),
+                        d.get("bme", ""),
+                        status,
+                    ),
+                )
+
+            total = len(self.inventur_data_kmat) + len(self.not_found_data_kmat)
+            self.count_label.config(
+                text=f"{total} entries ({len(self.inventur_data_kmat)} found, "
+                     f"{len(self.not_found_data_kmat)} not found)"
+            )
+        else:
+            all_items = []
+            for d in self.inventur_data:
+                all_items.append((d, "Found"))
+            for d in self.not_found_data:
+                all_items.append((d, "Not Found"))
+
+            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+
+            for d, status in all_items:
+                ts = d.get("zeitstempel", "")
+                time_part = ts.split(" ")[1] if " " in ts else ts
+                item_id = self.tree.insert(
+                    "", "end",
+                    values=(
+                        time_part,
+                        d.get("charge", ""),
+                        d.get("material", ""),
+                        d.get("fach", ""),
+                        status,
+                    ),
+                )
+                if status == "Not Found":
+                    self.tree.set(item_id, "Status", "NOT FOUND")
+                else:
+                    self.tree.set(item_id, "Status", "Found")
+
+            total = len(self.inventur_data) + len(self.not_found_data)
+            self.count_label.config(
+                text=f"{total} rolls ({len(self.inventur_data)} found, "
+                     f"{len(self.not_found_data)} not found)"
+            )
 
     # ------------------------------------------------------------------
-    # Excel save
+    # Excel save (SK)
     # ------------------------------------------------------------------
 
     INVENTORY_HEADERS = [
@@ -1235,7 +2507,143 @@ class InventurAppSK:
             self.logger.error(f"Error saving Excel: {e}")
 
     # ------------------------------------------------------------------
-    # Load existing session
+    # Excel save (Zert)
+    # ------------------------------------------------------------------
+
+    ZERT_HEADERS = [
+        "Timestamp",
+        "Material No.",
+        "Description",
+        "Mat. Type",
+        "Plant",
+        "Location",
+        "Charge",
+        "UOM",
+        "Free Usable",
+        "Length (mm)",
+        "Width (mm)",
+        "ADV",
+        "Recorded Quantity",
+        "Remarks",
+    ]
+
+    def _row_from_zert_item(self, d):
+        def _clean(v):
+            if v is None:
+                return ""
+            s = str(v)
+            if s.lower() == "nan":
+                return ""
+            return s
+
+        return [
+            _clean(d.get("zeitstempel", "")),
+            _clean(d.get("material", "")),
+            _clean(d.get("kurztext", "")),
+            _clean(d.get("mart", "")),
+            _clean(d.get("werk", "")),
+            _clean(d.get("lort", "")),
+            _clean(d.get("charge", "")),
+            _clean(d.get("bme", "")),
+            _clean(d.get("frei_verw", "")),
+            _clean(d.get("laenge_mm", "")),
+            _clean(d.get("breite_mm", "")),
+            _clean(d.get("adv", "")),
+            _clean(d.get("menge", "")),
+            _clean(d.get("remarks", "")),
+        ]
+
+    def save_zert_excel(self):
+        """Write Inventory_Zert.xlsx with Inventory and Not_Found sheets."""
+        try:
+            wb = Workbook()
+            if "Sheet" in wb.sheetnames:
+                wb.remove(wb["Sheet"])
+
+            ws_inv = wb.create_sheet("Inventory")
+            ws_inv.append(self.ZERT_HEADERS)
+            for d in self.inventur_data_zert:
+                ws_inv.append(self._row_from_zert_item(d))
+
+            ws_nf = wb.create_sheet("Not_Found")
+            ws_nf.append(self.ZERT_HEADERS)
+            for d in self.not_found_data_zert:
+                ws_nf.append(self._row_from_zert_item(d))
+
+            self.export_zert_path.mkdir(parents=True, exist_ok=True)
+            wb.save(self.inventur_zert_path)
+            self.logger.info(f"Zert Excel saved: {self.inventur_zert_path}")
+
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Error saving Zert Excel file:\n{e}")
+            self.logger.error(f"Error saving Zert Excel: {e}")
+
+    # ------------------------------------------------------------------
+    # Excel save (KMAT)
+    # ------------------------------------------------------------------
+
+    KMAT_HEADERS = [
+        "Timestamp",
+        "Plant",
+        "Location",
+        "Material No.",
+        "Description",
+        "Kauf-Nr.",
+        "POS",
+        "UOM",
+        "Free Usable",
+        "Recorded Quantity",
+        "Remarks",
+    ]
+
+    def _row_from_kmat_item(self, d):
+        def _clean(v):
+            if v is None:
+                return ""
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return [
+            _clean(d.get("zeitstempel", "")),
+            _clean(d.get("werk", "")),
+            _clean(d.get("lort", "")),
+            _clean(d.get("material", "")),
+            _clean(d.get("kurztext", "")),
+            _clean(d.get("kauf", "")),
+            _clean(d.get("pos", "")),
+            _clean(d.get("bme", "")),
+            _clean(d.get("frei_verw", "")),
+            _clean(d.get("menge", "")),
+            _clean(d.get("remarks", "")),
+        ]
+
+    def save_kmat_excel(self):
+        """Write Inventory_KMAT.xlsx with Inventory and Not_Found sheets."""
+        try:
+            wb = Workbook()
+            if "Sheet" in wb.sheetnames:
+                wb.remove(wb["Sheet"])
+
+            ws_inv = wb.create_sheet("Inventory")
+            ws_inv.append(self.KMAT_HEADERS)
+            for d in self.inventur_data_kmat:
+                ws_inv.append(self._row_from_kmat_item(d))
+
+            ws_nf = wb.create_sheet("Not_Found")
+            ws_nf.append(self.KMAT_HEADERS)
+            for d in self.not_found_data_kmat:
+                ws_nf.append(self._row_from_kmat_item(d))
+
+            self.export_kmat_path.mkdir(parents=True, exist_ok=True)
+            wb.save(self.inventur_kmat_path)
+            self.logger.info(f"KMAT Excel saved: {self.inventur_kmat_path}")
+
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Error saving KMAT Excel file:\n{e}")
+            self.logger.error(f"Error saving KMAT Excel: {e}")
+
+    # ------------------------------------------------------------------
+    # Load existing session (SK)
     # ------------------------------------------------------------------
 
     def load_existing_cz(self):
@@ -1306,29 +2714,183 @@ class InventurAppSK:
         }
 
     # ------------------------------------------------------------------
+    # Load existing session (Zert)
+    # ------------------------------------------------------------------
+
+    def load_existing_zert(self):
+        """Resume a previous Zert session by loading Inventory_Zert.xlsx."""
+        if not self.inventur_zert_path.exists():
+            return
+
+        loaded = 0
+        try:
+            df_inv = pd.read_excel(
+                self.inventur_zert_path, sheet_name="Inventory", dtype={"Charge": str})
+            for _, row in df_inv.iterrows():
+                self.inventur_data_zert.append(self._row_to_zert_dict(row, status="found"))
+                loaded += 1
+        except Exception as e:
+            self.logger.error(f"Error loading Zert Inventory sheet: {e}")
+
+        try:
+            df_nf = pd.read_excel(
+                self.inventur_zert_path, sheet_name="Not_Found", dtype={"Charge": str})
+            for _, row in df_nf.iterrows():
+                self.not_found_data_zert.append(self._row_to_zert_dict(row, status="not_found"))
+                loaded += 1
+        except Exception:
+            pass
+
+        if loaded:
+            self.update_list()
+            self.status_var.set(
+                f"Zert session resumed: {len(self.inventur_data_zert)} found, "
+                f"{len(self.not_found_data_zert)} not found."
+            )
+            self.logger.info(f"Existing Zert session loaded: {loaded} rows")
+
+    def _row_to_zert_dict(self, row, status):
+        def _str(v):
+            try:
+                if pd.isna(v):
+                    return ""
+            except (TypeError, ValueError):
+                pass
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return {
+            "zeitstempel": _str(row.get("Timestamp", "")),
+            "material": _str(row.get("Material No.", "")),
+            "kurztext": _str(row.get("Description", "")),
+            "mart": _str(row.get("Mat. Type", "")),
+            "werk": _str(row.get("Plant", "")),
+            "lort": _str(row.get("Location", "")),
+            "charge": _str(row.get("Charge", "")),
+            "bme": _str(row.get("UOM", "")),
+            "frei_verw": _str(row.get("Free Usable", "")),
+            "laenge_mm": _str(row.get("Length (mm)", "")),
+            "breite_mm": _str(row.get("Width (mm)", "")),
+            "adv": _str(row.get("ADV", "")),
+            "menge": _str(row.get("Recorded Quantity", "")),
+            "remarks": _str(row.get("Remarks", "")),
+            "status": status,
+        }
+
+    # ------------------------------------------------------------------
+    # Load existing session (KMAT)
+    # ------------------------------------------------------------------
+
+    def load_existing_kmat(self):
+        """Resume a previous KMAT session by loading Inventory_KMAT.xlsx."""
+        if not self.inventur_kmat_path.exists():
+            return
+
+        loaded = 0
+        try:
+            df_inv = pd.read_excel(
+                self.inventur_kmat_path, sheet_name="Inventory", dtype={"Kauf-Nr.": str, "POS": str})
+            for _, row in df_inv.iterrows():
+                self.inventur_data_kmat.append(self._row_to_kmat_dict(row, status="found"))
+                loaded += 1
+        except Exception as e:
+            self.logger.error(f"Error loading KMAT Inventory sheet: {e}")
+
+        try:
+            df_nf = pd.read_excel(
+                self.inventur_kmat_path, sheet_name="Not_Found", dtype={"Kauf-Nr.": str, "POS": str})
+            for _, row in df_nf.iterrows():
+                self.not_found_data_kmat.append(self._row_to_kmat_dict(row, status="not_found"))
+                loaded += 1
+        except Exception:
+            pass
+
+        if loaded:
+            self.update_list()
+            self.status_var.set(
+                f"KMAT session resumed: {len(self.inventur_data_kmat)} found, "
+                f"{len(self.not_found_data_kmat)} not found."
+            )
+            self.logger.info(f"Existing KMAT session loaded: {loaded} rows")
+
+    def _row_to_kmat_dict(self, row, status):
+        def _str(v):
+            try:
+                if pd.isna(v):
+                    return ""
+            except (TypeError, ValueError):
+                pass
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return {
+            "zeitstempel": _str(row.get("Timestamp", "")),
+            "werk": _str(row.get("Plant", "")),
+            "lort": _str(row.get("Location", "")),
+            "material": _str(row.get("Material No.", "")),
+            "kurztext": _str(row.get("Description", "")),
+            "kauf": _str(row.get("Kauf-Nr.", "")),
+            "pos": _str(row.get("POS", "")),
+            "bme": _str(row.get("UOM", "")),
+            "frei_verw": _str(row.get("Free Usable", "")),
+            "menge": _str(row.get("Recorded Quantity", "")),
+            "remarks": _str(row.get("Remarks", "")),
+            "status": status,
+            "_mode": "kmat",
+        }
+
+    # ------------------------------------------------------------------
     # Export / Backup
     # ------------------------------------------------------------------
 
     def export_backup(self):
         """Save a timestamped backup of the current Excel file."""
         try:
-            # Always write the latest data first
-            self.save_cz_excel()
-
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_dir = self.export_path / "backups"
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            backup_file = backup_dir / f"Inventory_Rolls_SK_Backup_{timestamp}.xlsx"
 
-            if self.inventur_path.exists():
-                shutil.copy2(self.inventur_path, backup_file)
-                messagebox.showinfo(
-                    "Backup Created",
-                    f"Backup saved to:\n{backup_file}",
-                )
-                self.logger.info(f"Backup created: {backup_file}")
+            if self.warehouse_mode == "Zert":
+                self.save_zert_excel()
+                backup_dir = self.export_zert_path / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / f"Inventory_Zert_Backup_{timestamp}.xlsx"
+                source_file = self.inventur_zert_path
+                if source_file.exists():
+                    shutil.copy2(source_file, backup_file)
+                    messagebox.showinfo(
+                        "Backup Created",
+                        f"Backup saved to:\n{backup_file}",
+                    )
+                    self.logger.info(f"Zert backup created: {backup_file}")
+                else:
+                    messagebox.showwarning("Warning", "No Zert data file to backup yet.")
+            elif self.warehouse_mode == "KMAT":
+                self.save_kmat_excel()
+                backup_dir = self.export_kmat_path / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / f"Inventory_KMAT_Backup_{timestamp}.xlsx"
+                if self.inventur_kmat_path.exists():
+                    shutil.copy2(self.inventur_kmat_path, backup_file)
+                    messagebox.showinfo(
+                        "Backup Created",
+                        f"Backup saved to:\n{backup_file}",
+                    )
+                    self.logger.info(f"KMAT backup created: {backup_file}")
+                else:
+                    messagebox.showwarning("Warning", "No KMAT data file to backup yet.")
             else:
-                messagebox.showwarning("Warning", "No data file to backup yet.")
+                self.save_cz_excel()
+                backup_dir = self.export_path / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / f"Inventory_Rolls_SK_Backup_{timestamp}.xlsx"
+                if self.inventur_path.exists():
+                    shutil.copy2(self.inventur_path, backup_file)
+                    messagebox.showinfo(
+                        "Backup Created",
+                        f"Backup saved to:\n{backup_file}",
+                    )
+                    self.logger.info(f"Backup created: {backup_file}")
+                else:
+                    messagebox.showwarning("Warning", "No data file to backup yet.")
         except Exception as e:
             messagebox.showerror("Export Error", f"Error creating backup:\n{e}")
             self.logger.error(f"Backup error: {e}")
@@ -1348,12 +2910,40 @@ class InventurAppSK:
         if action == "add_found":
             self.inventur_data = [
                 d for d in self.inventur_data if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_cz_excel()
         elif action == "add_not_found":
             self.not_found_data = [
                 d for d in self.not_found_data if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_cz_excel()
+        elif action == "add_found_zert":
+            self.inventur_data_zert = [
+                d for d in self.inventur_data_zert if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_zert_excel()
+        elif action == "add_not_found_zert":
+            self.not_found_data_zert = [
+                d for d in self.not_found_data_zert if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_zert_excel()
+        elif action == "add_kmat":
+            kauf = data.get("kauf", "")
+            pos = data.get("pos", "")
+            self.inventur_data_kmat = [
+                d for d in self.inventur_data_kmat
+                if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+            if self.config.get("auto_save", True):
+                self.save_kmat_excel()
+        elif action == "add_not_found_kmat":
+            kauf = data.get("kauf", "")
+            pos = data.get("pos", "")
+            self.not_found_data_kmat = [
+                d for d in self.not_found_data_kmat
+                if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+            if self.config.get("auto_save", True):
+                self.save_kmat_excel()
 
-        if self.config.get("auto_save", True):
-            self.save_cz_excel()
         self.update_list()
         self.status_var.set(f"Undo: removed entry for batch '{charge}'")
         self.logger.info(f"Undo {action}: {charge}")
@@ -1383,16 +2973,38 @@ class InventurAppSK:
 
         values = self.tree.item(item_id, "values")
         if len(values) >= 2:
-            charge = values[1]
-            self.inventur_data = [
-                d for d in self.inventur_data if d.get("charge") != charge]
-            self.not_found_data = [
-                d for d in self.not_found_data if d.get("charge") != charge]
+            if self.warehouse_mode == "KMAT":
+                # For KMAT: values = (Time, Kauf-Nr., POS, ...)
+                kauf = values[1] if len(values) > 1 else ""
+                pos = values[2] if len(values) > 2 else ""
+                self.inventur_data_kmat = [
+                    d for d in self.inventur_data_kmat
+                    if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                self.not_found_data_kmat = [
+                    d for d in self.not_found_data_kmat
+                    if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                self.save_kmat_excel()
+                self.update_list()
+                self.status_var.set(f"Entry deleted: {kauf}/{pos}")
+                self.logger.info(f"KMAT entry deleted: {kauf}/{pos}")
+            else:
+                charge = values[1]
+                if self.warehouse_mode == "Zert":
+                    self.inventur_data_zert = [
+                        d for d in self.inventur_data_zert if d.get("charge") != charge]
+                    self.not_found_data_zert = [
+                        d for d in self.not_found_data_zert if d.get("charge") != charge]
+                    self.save_zert_excel()
+                else:
+                    self.inventur_data = [
+                        d for d in self.inventur_data if d.get("charge") != charge]
+                    self.not_found_data = [
+                        d for d in self.not_found_data if d.get("charge") != charge]
+                    self.save_cz_excel()
 
-            self.save_cz_excel()
-            self.update_list()
-            self.status_var.set(f"Entry deleted: {charge}")
-            self.logger.info(f"Entry deleted: {charge}")
+                self.update_list()
+                self.status_var.set(f"Entry deleted: {charge}")
+                self.logger.info(f"Entry deleted: {charge}")
 
     # ------------------------------------------------------------------
     # Misc helpers
@@ -1411,7 +3023,12 @@ class InventurAppSK:
             self.root.after(100, lambda: self.scan_entry.focus_set())
 
     def _manual_save(self):
-        self.save_cz_excel()
+        if self.warehouse_mode == "Zert":
+            self.save_zert_excel()
+        elif self.warehouse_mode == "KMAT":
+            self.save_kmat_excel()
+        else:
+            self.save_cz_excel()
         self.status_var.set("Manually saved.")
 
     def quit_app(self):
