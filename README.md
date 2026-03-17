@@ -5,7 +5,7 @@
 Desktop application for warehouse inventory at **Forbo**.
 Supports **three warehouse modes**: **Lager 1 (SK)**, **Zert**, and **KMAT**.
 
-- Version: **2.1**
+- Version: **2.2**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 
@@ -42,47 +42,47 @@ On first launch the program will ask you to locate the relevant file.
 
 | Column | Description |
 |--------|-------------|
-| `Charge` | Batch number (text, leading zeros preserved) |
+| `Batch` | Batch number (text, leading zeros preserved) |
 | `Material` | Material number |
-| `Materialkurztext` | Material description |
-| `Werk` | Plant |
-| `Lagerort` | Storage location (master) |
-| `Länge m` | Stage 0 length in metres |
-| `Breite mm` | Stage 0 width in mm |
-| `Frei verwendbar` | Free usable area (m²) |
-| `Lnge1` / `Brte1` | Stage 1 length (m) / width (mm) |
-| `Lnge2` / `Brte2` | Stage 2 length (m) / width (mm) |
+| `Material Description` | Material description |
+| `Plant` | Plant |
+| `Storage Location` | Storage location (master) |
+| `storage bin` | Shelf / storage bin |
+| `length m` | Stage 0 length in metres |
+| `width mm` | Stage 0 width in mm |
+| `Unrestricted` | Free usable area (m²) |
+| `length1` / `width1` | Stage 1 length (m) / width (mm) |
+| `length2` / `width2` | Stage 2 length (m) / width (mm) |
 
 **Required columns – Zert master table:**
 
 | Column | Description |
 |--------|-------------|
-| `Charge` | Batch number (text) |
-| `Materialnummer` | Material number |
-| `Materialkurztext` | Material description |
-| `MArt` | Material type |
-| `Werk` | Plant |
-| `LOrt` | Storage location |
-| `BME` | Unit of measure |
-| `Frei verwendbar` | Free usable quantity |
-| `Länge` | Length (mm) |
-| `Breite` | Width (mm) |
+| `Batch` | Batch number (text) |
+| `Material Number` | Material number |
+| `Material Description` | Material description |
+| `Plant` | Plant |
+| `Storage Location` | Storage location |
+| `Base Unit of Measure` | Unit of measure |
+| `Unrestricted` | Free usable quantity |
+| `Length` | Length (mm) |
+| `Width` | Width (mm) |
 | `ADV` | ADV description |
 
 **Required columns – KMAT master table:**
 
 | Column | Description |
 |--------|-------------|
-| `Kauf` | Customer order number (Kaufnummer) |
+| `Special stock number` | Customer order number |
 | `POS` | Position number within the order (e.g. 10, 20, 30) |
-| `Materialnummer` | Material number |
-| `Materialkurztext` | Material description |
-| `Werk` | Plant |
-| `Lagerort` | Storage location |
-| `BME` | Unit of measure |
-| `Frei verwendbar` | Free usable quantity (optional) |
+| `Material Number` | Material number |
+| `Material Description` | Material description |
+| `Plant` | Plant |
+| `Storage Location` | Storage location |
+| `Base Unit of Measure` | Unit of measure |
+| `Unrestricted` | Free usable quantity (optional) |
 
-> One Kaufnummer can have multiple positions. The combination of Kaufnummer + POS uniquely identifies a product.
+> One Special stock number can have multiple positions. The combination of Special stock number + POS uniquely identifies a product.
 
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
@@ -156,11 +156,11 @@ Closing the dialog without a selection exits the application.
 ### KMAT – Basic workflow
 
 1. **Scan a barcode**
-   - The scanner reads only the **Kaufnummer** (customer order number), e.g. `17131209`
-   - If the Kaufnummer does not exist in the master table, an error message is shown and the scan is reset — no manual entry is possible
+   - The scanner reads only the **Special stock number** (customer order number), e.g. `17131209`
+   - If the Special stock number does not exist in the master table, an error message is shown and the scan is reset — no manual entry is possible
 
 2. **Select Position**
-   - A dialog opens automatically showing all available positions for that Kaufnummer
+   - A dialog opens automatically showing all available positions for that Special stock number
    - Select the correct **POS** from the dropdown and click **OK**
 
 3. **Product found**
@@ -169,7 +169,7 @@ Closing the dialog without a selection exits the application.
    - Optionally add a **Remark** before saving
 
 4. **Duplicate protection**
-   - The combination of Kaufnummer + POS is checked — re-scanning the same combination is blocked
+   - The combination of Special stock number + POS is checked — re-scanning the same combination is blocked
 
 ### QR Code Format (SK and Zert modes)
 
@@ -215,7 +215,7 @@ If the scanned value contains no semicolons, the entire string is treated as the
 | Batch No. | Batch number (text-formatted) |
 | Length S0–S2 (mm) | Roll length per stage |
 | Width S0–S2 (mm) | Roll width per stage |
-| Area (m2) | Calculated: `Länge m × Breite mm / 1000` |
+| Area (m2) | Calculated: `length m × width mm / 1000` |
 | Free Usable | Free usable area from master table |
 | Shelf Location | Shelf location entered during scan |
 | Measured Width (mm) | Width measured during scan |
@@ -235,19 +235,18 @@ If the scanned value contains no semicolons, the entire string is treated as the
 | Timestamp | Date and time of scan |
 | Material No. | Material number |
 | Description | Material description |
-| Mat. Type | Material type |
 | Plant | Plant code |
 | Location | Storage location |
-| Charge | Batch number (text-formatted) |
-| UOM | Unit of measure |
-| Free Usable | Free usable quantity from master table |
-| Length (mm) | Length from master table |
-| Width (mm) | Width from master table |
+| Batch | Batch number (text-formatted) |
+| Base Unit of Measure | Unit of measure |
+| Unrestricted | Free usable quantity from master table |
+| Length | Length from master table |
+| Width | Width from master table |
 | ADV | ADV description |
 | Recorded Quantity | Quantity entered during scan |
 | Remarks | Optional remark |
 
-> **Note:** The Charge column is always formatted as text to preserve leading zeros (e.g. `0618570243`).
+> **Note:** The Batch column is always formatted as text to preserve leading zeros (e.g. `0618570243`).
 
 ### KMAT: `Inventory_KMAT.xlsx`
 
@@ -265,7 +264,7 @@ If the scanned value contains no semicolons, the entire string is treated as the
 | Location | Storage location |
 | Material No. | Material number |
 | Description | Material description |
-| Kauf-Nr. | Customer order number (Kaufnummer) |
+| Special stock number | Customer order number |
 | POS | Position number within the order |
 | UOM | Unit of measure |
 | Free Usable | Free usable quantity from master table |
@@ -405,8 +404,8 @@ All activity is logged to `config/inventory_sk.log`:
 - Check the scanned items list — the entry may already be recorded
 - Right-click the entry and select **Delete** if needed, then rescan
 
-### KMAT: Kundenauftrag not found
-- Verify that the Kaufnummer exists in the KMAT master table
+### KMAT: Special stock number not found
+- Verify that the Special stock number exists in the KMAT master table
 - Make sure the correct master table file is configured in Settings
 - No manual entry is possible in KMAT mode — only entries present in the master table can be recorded
 
@@ -422,4 +421,4 @@ If problems persist:
 ---
 
 **Developed for Forbo Movement Systems**
-*Version 2.1 – March 2026*
+*Version 2.2 – March 2026*

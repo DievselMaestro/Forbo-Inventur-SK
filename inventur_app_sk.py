@@ -929,10 +929,10 @@ class InventurAppSK:
         try:
             self.df_rollen = pd.read_excel(
                 self.arbeitstabelle_path,
-                dtype={"Charge": str},
+                dtype={"Batch": str},
             )
-            if "Charge" in self.df_rollen.columns:
-                self.df_rollen["Charge"] = self.df_rollen["Charge"].astype(str)
+            if "Batch" in self.df_rollen.columns:
+                self.df_rollen["Batch"] = self.df_rollen["Batch"].astype(str)
 
             count = len(self.df_rollen)
             self.logger.info(f"Master table loaded: {count} rows from {self.arbeitstabelle_path}")
@@ -957,9 +957,9 @@ class InventurAppSK:
             self.logger.warning("Zert master table not loaded")
             return
         try:
-            self.df_zert = pd.read_excel(self.arbeitstabelle_zert_path, dtype={"Charge": str})
-            if "Charge" in self.df_zert.columns:
-                self.df_zert["Charge"] = self.df_zert["Charge"].astype(str)
+            self.df_zert = pd.read_excel(self.arbeitstabelle_zert_path, dtype={"Batch": str})
+            if "Batch" in self.df_zert.columns:
+                self.df_zert["Batch"] = self.df_zert["Batch"].astype(str)
             count = len(self.df_zert)
             self.logger.info(f"Zert master table loaded: {count} rows")
             self.status_var.set(f"Zert master table loaded: {count} entries")
@@ -992,8 +992,8 @@ class InventurAppSK:
                 except (ValueError, TypeError):
                     return ""
 
-            if "Kauf" in self.df_kmat.columns:
-                self.df_kmat["Kauf"] = self.df_kmat["Kauf"].apply(_norm_num)
+            if "Special stock number" in self.df_kmat.columns:
+                self.df_kmat["Special stock number"] = self.df_kmat["Special stock number"].apply(_norm_num)
             if "POS" in self.df_kmat.columns:
                 self.df_kmat["POS"] = self.df_kmat["POS"].apply(_norm_num)
 
@@ -1013,7 +1013,7 @@ class InventurAppSK:
         """Look up a charge in df_rollen. Returns row dict or None."""
         if self.df_rollen is None:
             return None
-        matches = self.df_rollen[self.df_rollen["Charge"] == str(charge)]
+        matches = self.df_rollen[self.df_rollen["Batch"] == str(charge)]
         if not matches.empty:
             return matches.iloc[0].to_dict()
         return None
@@ -1026,7 +1026,7 @@ class InventurAppSK:
         """Look up a charge in df_zert. Returns row dict or None."""
         if self.df_zert is None:
             return None
-        matches = self.df_zert[self.df_zert["Charge"] == str(charge)]
+        matches = self.df_zert[self.df_zert["Batch"] == str(charge)]
         if not matches.empty:
             return matches.iloc[0].to_dict()
         return None
@@ -1049,7 +1049,7 @@ class InventurAppSK:
         except (ValueError, TypeError):
             pos_norm = str(pos).strip()
         matches = self.df_kmat[
-            (self.df_kmat["Kauf"] == kauf_norm) &
+            (self.df_kmat["Special stock number"] == kauf_norm) &
             (self.df_kmat["POS"] == pos_norm)
         ]
         if not matches.empty:
@@ -1064,7 +1064,7 @@ class InventurAppSK:
             kauf_norm = str(int(float(str(kauf).strip())))
         except (ValueError, TypeError):
             kauf_norm = str(kauf).strip()
-        rows = self.df_kmat[self.df_kmat["Kauf"] == kauf_norm]
+        rows = self.df_kmat[self.df_kmat["Special stock number"] == kauf_norm]
         return rows["POS"].tolist()
 
     # ------------------------------------------------------------------
@@ -1885,9 +1885,9 @@ class InventurAppSK:
             except (ValueError, TypeError):
                 return str(val)
 
-        # Compute Area (m2) from Länge m × Breite mm / 1000
-        laenge_m = row_data.get("Länge m", None)
-        breite_mm = row_data.get("Breite mm", None)
+        # Compute Area (m2) from length m × width mm / 1000
+        laenge_m = row_data.get("length m", None)
+        breite_mm = row_data.get("width mm", None)
         if laenge_m not in (None, "") and breite_mm not in (None, ""):
             try:
                 flache_val = f"{float(laenge_m) * float(breite_mm) / 1000:.2f}"
@@ -1898,11 +1898,11 @@ class InventurAppSK:
 
         self.current_scan = {
             "charge": qr["charge"],
-            "lort_master": _fmt_int(row_data.get("Lagerort", "") or ""),
+            "lort_master": _fmt_int(row_data.get("Storage Location", "") or ""),
             "lort_qr": qr["lort"],
             "material": _fmt_int(row_data.get("Material", "") or ""),
-            "kurztext": str(row_data.get("Materialkurztext", "") or ""),
-            "werk": _fmt_int(row_data.get("Werk", "") or ""),
+            "kurztext": str(row_data.get("Material Description", "") or ""),
+            "werk": _fmt_int(row_data.get("Plant", "") or ""),
             "lnge0": qr["lnge0"],
             "brte0": qr["brte0"],
             "lnge1": qr["lnge1"],
@@ -1910,7 +1910,7 @@ class InventurAppSK:
             "lnge2": qr["lnge2"],
             "brte2": qr["brte2"],
             "flache": flache_val,
-            "frei_verw": _fmt_float2(row_data.get("Frei verwendbar", "") or ""),
+            "frei_verw": _fmt_float2(row_data.get("Unrestricted", "") or ""),
             "status": "found",
         }
 
@@ -1957,15 +1957,15 @@ class InventurAppSK:
 
         self.current_scan = {
             "charge": charge,
-            "material": _s(row_data.get("Material", "") or _s(row_data.get("Materialnummer", ""))),
-            "kurztext": _s(row_data.get("Materialkurztext", "")),
+            "material": _s(row_data.get("Material Number", "")),
+            "kurztext": _s(row_data.get("Material Description", "")),
             "mart": _s(row_data.get("MArt", "")),
-            "werk": _s(row_data.get("Werk", "")),
-            "lort": _s(row_data.get("Lagerort", "") or _s(row_data.get("LOrt", ""))),
-            "bme": _s(row_data.get("BME", "") or _s(row_data.get("Basismengeneinheit", ""))),
-            "frei_verw": _s(row_data.get("Frei verwendbar", "")),
-            "laenge_mm": _s(row_data.get("Länge", "") or _s(row_data.get("Länge (mm)", "") or _s(row_data.get("Laenge mm", "")))),
-            "breite_mm": _s(row_data.get("Breite", "") or _s(row_data.get("Breite (mm)", "") or _s(row_data.get("Breite mm", "")))),
+            "werk": _s(row_data.get("Plant", "")),
+            "lort": _s(row_data.get("Storage Location", "")),
+            "bme": _s(row_data.get("Base Unit of Measure", "")),
+            "frei_verw": _s(row_data.get("Unrestricted", "")),
+            "laenge_mm": _s(row_data.get("Length", "")),
+            "breite_mm": _s(row_data.get("Width", "")),
             "adv": _s(row_data.get("ADV", "")),
             "status": "found",
             "_mode": "zert",
@@ -2014,12 +2014,12 @@ class InventurAppSK:
         self.current_scan = {
             "kauf": kauf,
             "pos": pos,
-            "material": _s(row_data.get("Materialnummer", "")),
-            "kurztext": _s(row_data.get("Materialkurztext", "")),
-            "werk": _s(row_data.get("Werk", "")),
-            "lort": _s(row_data.get("Lagerort", "")),
-            "bme": _s(row_data.get("BME", "")),
-            "frei_verw": _s(row_data.get("Frei verwendbar", "")),
+            "material": _s(row_data.get("Material Number", "")),
+            "kurztext": _s(row_data.get("Material Description", "")),
+            "werk": _s(row_data.get("Plant", "")),
+            "lort": _s(row_data.get("Storage Location", "")),
+            "bme": _s(row_data.get("Base Unit of Measure", "")),
+            "frei_verw": _s(row_data.get("Unrestricted", "")),
             "status": "found",
             "_mode": "kmat",
         }
