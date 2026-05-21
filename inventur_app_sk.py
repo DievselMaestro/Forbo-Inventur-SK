@@ -1209,6 +1209,7 @@ class InventurAppSK:
         """Build the main UI."""
         style = ttk.Style()
         style.configure("BigScan.TButton", font=("Arial", 20))
+        style.configure("BigSave.TButton", font=("Arial", 20))
         if self.warehouse_mode == "Zert":
             self.root.title("INVENTORY Forbo - Zert Warehouse")
         elif self.warehouse_mode == "KMAT":
@@ -1442,37 +1443,37 @@ class InventurAppSK:
 
         # Fach (mandatory) — row 0
         lbl_fach = ttk.Label(self.input_container, text="Shelf Location *:",
-                              font=("Arial", 11, "bold"))
+                              font=("Arial", 22, "bold"))
         lbl_fach.grid(row=0, column=0, sticky=tk.W, pady=5)
         entry_fach = ttk.Entry(self.input_container, textvariable=self.fach_var,
-                                font=("Arial", 12), width=20)
+                                font=("Arial", 24), width=20)
         entry_fach.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_fach.bind("<Return>", lambda e: self.input_widgets["brte_meas_entry"].focus_set())
         self.input_widgets["fach_entry"] = entry_fach
 
         # Measured Width (mandatory) — row 1
         lbl_brte_meas = ttk.Label(self.input_container, text="Measured Width (mm) *:",
-                                   font=("Arial", 11, "bold"))
+                                   font=("Arial", 22, "bold"))
         lbl_brte_meas.grid(row=1, column=0, sticky=tk.W, pady=5)
         entry_brte_meas = ttk.Entry(self.input_container, textvariable=self.brte_meas_var,
-                                     font=("Arial", 12), width=10)
+                                     font=("Arial", 24), width=10)
         entry_brte_meas.grid(row=1, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_brte_meas.bind("<Return>", self.save_current_scan)
         self.input_widgets["brte_meas_entry"] = entry_brte_meas
 
         # Remarks (optional) — row 2
         lbl_remarks = ttk.Label(self.input_container, text="Remarks (optional):",
-                                 font=("Arial", 11, "bold"))
+                                 font=("Arial", 22, "bold"))
         lbl_remarks.grid(row=2, column=0, sticky=tk.W, pady=5)
         entry_remarks = ttk.Entry(self.input_container, textvariable=self.remarks_var,
-                                   font=("Arial", 12), width=50)
+                                   font=("Arial", 24), width=50)
         entry_remarks.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_remarks.bind("<Return>", self.save_current_scan)
         self.input_widgets["remarks_entry"] = entry_remarks
 
         # Save button — row 3
         save_btn = ttk.Button(self.input_container, text="Save",
-                               command=self.save_current_scan)
+                               command=self.save_current_scan, style="BigSave.TButton")
         save_btn.grid(row=3, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.input_widgets["save_button"] = save_btn
 
@@ -1528,27 +1529,27 @@ class InventurAppSK:
         self.zert_input_container.columnconfigure(1, weight=1)
 
         ttk.Label(self.zert_input_container, text="Recorded Quantity *:",
-                  font=("Arial", 11, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+                  font=("Arial", 22, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
         entry_menge = ttk.Entry(self.zert_input_container, textvariable=self.menge_var,
-                                font=("Arial", 12), width=15)
+                                font=("Arial", 24), width=15)
         entry_menge.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_menge.bind("<Return>", self.save_current_scan_zert)
         self.zert_input_widgets["menge_entry"] = entry_menge
 
         self.zert_lbl_bme_input = ttk.Label(self.zert_input_container, text="",
-                                             font=("Arial", 10), foreground="gray")
+                                             font=("Arial", 20), foreground="gray")
         self.zert_lbl_bme_input.grid(row=0, column=2, sticky=tk.W, padx=(8, 0), pady=5)
 
         ttk.Label(self.zert_input_container, text="Remarks:",
-                  font=("Arial", 11, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+                  font=("Arial", 22, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
         entry_zert_remarks = ttk.Entry(self.zert_input_container, textvariable=self.zert_remarks_var,
-                                        font=("Arial", 12), width=40)
+                                        font=("Arial", 24), width=40)
         entry_zert_remarks.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(10, 0), pady=5)
         entry_zert_remarks.bind("<Return>", self.save_current_scan_zert)
         self.zert_input_widgets["remarks_entry"] = entry_zert_remarks
 
         save_btn = ttk.Button(self.zert_input_container, text="Save",
-                               command=self.save_current_scan_zert)
+                               command=self.save_current_scan_zert, style="BigSave.TButton")
         save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.zert_input_widgets["save_button"] = save_btn
 
@@ -1598,27 +1599,27 @@ class InventurAppSK:
         self.kmat_input_container.columnconfigure(1, weight=1)
 
         ttk.Label(self.kmat_input_container, text="Recorded Quantity *:",
-                  font=("Arial", 11, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
+                  font=("Arial", 22, "bold")).grid(row=0, column=0, sticky=tk.W, pady=5)
         entry_menge = ttk.Entry(self.kmat_input_container, textvariable=self.kmat_menge_var,
-                                font=("Arial", 12), width=15)
+                                font=("Arial", 24), width=15)
         entry_menge.grid(row=0, column=1, sticky=tk.W, padx=(10, 0), pady=5)
         entry_menge.bind("<Return>", self.save_current_scan_kmat)
         self.kmat_input_widgets["menge_entry"] = entry_menge
 
         self.kmat_lbl_bme_input = ttk.Label(self.kmat_input_container, text="",
-                                             font=("Arial", 10), foreground="gray")
+                                             font=("Arial", 20), foreground="gray")
         self.kmat_lbl_bme_input.grid(row=0, column=2, sticky=tk.W, padx=(8, 0), pady=5)
 
         ttk.Label(self.kmat_input_container, text="Remarks:",
-                  font=("Arial", 11, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
+                  font=("Arial", 22, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5)
         entry_remarks = ttk.Entry(self.kmat_input_container, textvariable=self.kmat_remarks_var,
-                                  font=("Arial", 12), width=40)
+                                  font=("Arial", 24), width=40)
         entry_remarks.grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(10, 0), pady=5)
         entry_remarks.bind("<Return>", self.save_current_scan_kmat)
         self.kmat_input_widgets["remarks_entry"] = entry_remarks
 
         save_btn = ttk.Button(self.kmat_input_container, text="Save",
-                               command=self.save_current_scan_kmat)
+                               command=self.save_current_scan_kmat, style="BigSave.TButton")
         save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.kmat_input_widgets["save_button"] = save_btn
 
@@ -3027,30 +3028,30 @@ class InventurAppSK:
 
         if self.warehouse_mode == "SK":
             # Show identifier (read-only)
-            ttk.Label(frame, text="Batch No.:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Batch No.:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 11)).grid(
+            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="Shelf Location *:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Shelf Location *:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             fach_var = tk.StringVar(value=entry.get("fach", ""))
-            fach_entry = ttk.Entry(frame, textvariable=fach_var, font=("Arial", 12), width=20)
+            fach_entry = ttk.Entry(frame, textvariable=fach_var, font=("Arial", 18), width=20)
             fach_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="Measured Width (mm) *:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Measured Width (mm) *:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             brte_var = tk.StringVar(value=entry.get("brte_meas", ""))
-            brte_entry = ttk.Entry(frame, textvariable=brte_var, font=("Arial", 12), width=10)
+            brte_entry = ttk.Entry(frame, textvariable=brte_var, font=("Arial", 18), width=10)
             brte_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Remarks:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             remarks_var = tk.StringVar(value=entry.get("remarks", ""))
-            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 18), width=40)
             remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
@@ -3083,23 +3084,23 @@ class InventurAppSK:
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
         elif self.warehouse_mode == "Zert":
-            ttk.Label(frame, text="Charge:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Charge:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 11)).grid(
+            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             menge_var = tk.StringVar(value=entry.get("menge", ""))
-            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 12), width=15)
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 18), width=15)
             menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Remarks:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             remarks_var = tk.StringVar(value=entry.get("remarks", ""))
-            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 18), width=40)
             remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
@@ -3126,29 +3127,29 @@ class InventurAppSK:
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
         else:  # KMAT
-            ttk.Label(frame, text="Kauf-Nr.:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Kauf-Nr.:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("kauf", ""), font=("Arial", 11)).grid(
+            ttk.Label(frame, text=entry.get("kauf", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="POS:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="POS:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("pos", ""), font=("Arial", 11)).grid(
+            ttk.Label(frame, text=entry.get("pos", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             menge_var = tk.StringVar(value=entry.get("menge", ""))
-            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 12), width=15)
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 18), width=15)
             menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+            ttk.Label(frame, text="Remarks:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             remarks_var = tk.StringVar(value=entry.get("remarks", ""))
-            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 18), width=40)
             remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
@@ -3177,8 +3178,10 @@ class InventurAppSK:
         # Buttons row
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=row, column=0, columnspan=2, pady=(12, 0))
-        ttk.Button(btn_frame, text="Save", command=save_edit).grid(row=0, column=0, padx=(0, 10))
-        ttk.Button(btn_frame, text="Cancel", command=dlg.destroy).grid(row=0, column=1)
+        ttk.Button(btn_frame, text="Save", command=save_edit,
+                   style="BigSave.TButton").grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(btn_frame, text="Cancel", command=dlg.destroy,
+                   style="BigSave.TButton").grid(row=0, column=1)
 
         # Center dialog on parent
         dlg.update_idletasks()
