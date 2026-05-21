@@ -9,8 +9,8 @@ Supports Rolls only (no granulate).
 Supports two warehouse modes: SK (Malacky) and Zert.
 Developed for Windows 11, Python 3.11+
 
-Date: March 2026
-Version: 1.1 SK+Zert
+Date: Mai 2026
+Version: 2.3 SK+Zert
 """
 
 import tkinter as tk
@@ -1207,6 +1207,8 @@ class InventurAppSK:
 
     def setup_ui(self):
         """Build the main UI."""
+        style = ttk.Style()
+        style.configure("BigScan.TButton", font=("Arial", 20))
         if self.warehouse_mode == "Zert":
             self.root.title("INVENTORY Forbo - Zert Warehouse")
         elif self.warehouse_mode == "KMAT":
@@ -1297,10 +1299,10 @@ class InventurAppSK:
 
         self.scan_var = tk.StringVar()
         self.scan_entry = ttk.Entry(scan_frame, textvariable=self.scan_var,
-                                    font=("Arial", 14), width=50)
+                                    font=("Arial", 28), width=50)
         self.scan_entry.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 10))
 
-        ttk.Button(scan_frame, text="Scan", command=self.process_scan).grid(row=0, column=1)
+        ttk.Button(scan_frame, text="Scan", command=self.process_scan, style="BigScan.TButton").grid(row=0, column=1, padx=(0, 0))
 
         self.scan_entry.bind("<Return>", lambda e: self.process_scan())
 
@@ -2959,12 +2961,231 @@ class InventurAppSK:
         item_id = selection[0]
 
         menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Edit entry",
+                         command=lambda: self._edit_entry(item_id))
+        menu.add_separator()
         menu.add_command(label="Delete entry",
                          command=lambda: self._delete_entry(item_id))
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
+
+    def _edit_entry(self, item_id):
+        """Open a dialog to edit correctable fields of a scanned entry."""
+        values = self.tree.item(item_id, "values")
+        if not values:
+            return
+
+        # Find the matching entry in the data list
+        if self.warehouse_mode == "KMAT":
+            kauf = values[1] if len(values) > 1 else ""
+            pos = values[2] if len(values) > 2 else ""
+            entry = next(
+                (d for d in self.inventur_data_kmat
+                 if d.get("kauf") == kauf and d.get("pos") == pos),
+                None)
+            if entry is None:
+                entry = next(
+                    (d for d in self.not_found_data_kmat
+                     if d.get("kauf") == kauf and d.get("pos") == pos),
+                    None)
+        else:
+            charge = values[1] if len(values) > 1 else ""
+            if self.warehouse_mode == "Zert":
+                entry = next(
+                    (d for d in self.inventur_data_zert if d.get("charge") == charge),
+                    None)
+                if entry is None:
+                    entry = next(
+                        (d for d in self.not_found_data_zert if d.get("charge") == charge),
+                        None)
+            else:  # SK
+                entry = next(
+                    (d for d in self.inventur_data if d.get("charge") == charge),
+                    None)
+                if entry is None:
+                    entry = next(
+                        (d for d in self.not_found_data if d.get("charge") == charge),
+                        None)
+
+        if entry is None:
+            messagebox.showerror("Error", "Entry not found in data.")
+            return
+
+        # Build modal edit dialog
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Edit Entry")
+        dlg.resizable(False, False)
+        dlg.grab_set()
+        dlg.transient(self.root)
+
+        frame = ttk.Frame(dlg, padding="20")
+        frame.grid(row=0, column=0)
+
+        row = 0
+
+        if self.warehouse_mode == "SK":
+            # Show identifier (read-only)
+            ttk.Label(frame, text="Batch No.:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 11)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Shelf Location *:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            fach_var = tk.StringVar(value=entry.get("fach", ""))
+            fach_entry = ttk.Entry(frame, textvariable=fach_var, font=("Arial", 12), width=20)
+            fach_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Measured Width (mm) *:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            brte_var = tk.StringVar(value=entry.get("brte_meas", ""))
+            brte_entry = ttk.Entry(frame, textvariable=brte_var, font=("Arial", 12), width=10)
+            brte_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            remarks_var = tk.StringVar(value=entry.get("remarks", ""))
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            def save_edit():
+                new_fach = fach_var.get().strip()
+                new_brte = brte_var.get().strip()
+                new_remarks = remarks_var.get().strip()
+                if not new_fach:
+                    messagebox.showerror("Validation", "Shelf Location is required.", parent=dlg)
+                    return
+                if not new_brte:
+                    messagebox.showerror("Validation", "Measured Width is required.", parent=dlg)
+                    return
+                try:
+                    int(new_brte)
+                except ValueError:
+                    messagebox.showerror("Validation", "Measured Width must be a number.", parent=dlg)
+                    return
+                entry["fach"] = new_fach
+                entry["brte_meas"] = new_brte
+                entry["remarks"] = new_remarks
+                self.save_cz_excel()
+                self.update_list()
+                self.status_var.set(f"Entry updated: {entry.get('charge', '')}")
+                dlg.destroy()
+
+            fach_entry.focus_set()
+            fach_entry.bind("<Return>", lambda e: brte_entry.focus_set())
+            brte_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
+            remarks_entry.bind("<Return>", lambda e: save_edit())
+
+        elif self.warehouse_mode == "Zert":
+            ttk.Label(frame, text="Charge:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 11)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            menge_var = tk.StringVar(value=entry.get("menge", ""))
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 12), width=15)
+            menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            remarks_var = tk.StringVar(value=entry.get("remarks", ""))
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            def save_edit():
+                new_menge = menge_var.get().strip()
+                new_remarks = remarks_var.get().strip()
+                if not new_menge:
+                    messagebox.showerror("Validation", "Quantity is required.", parent=dlg)
+                    return
+                try:
+                    float(new_menge)
+                except ValueError:
+                    messagebox.showerror("Validation", "Quantity must be a number.", parent=dlg)
+                    return
+                entry["menge"] = new_menge
+                entry["remarks"] = new_remarks
+                self.save_zert_excel()
+                self.update_list()
+                self.status_var.set(f"Entry updated: {entry.get('charge', '')}")
+                dlg.destroy()
+
+            menge_entry.focus_set()
+            menge_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
+            remarks_entry.bind("<Return>", lambda e: save_edit())
+
+        else:  # KMAT
+            ttk.Label(frame, text="Kauf-Nr.:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("kauf", ""), font=("Arial", 11)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="POS:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("pos", ""), font=("Arial", 11)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            menge_var = tk.StringVar(value=entry.get("menge", ""))
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 12), width=15)
+            menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Remarks:", font=("Arial", 11, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            remarks_var = tk.StringVar(value=entry.get("remarks", ""))
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 12), width=40)
+            remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            def save_edit():
+                new_menge = menge_var.get().strip()
+                new_remarks = remarks_var.get().strip()
+                if not new_menge:
+                    messagebox.showerror("Validation", "Quantity is required.", parent=dlg)
+                    return
+                try:
+                    float(new_menge)
+                except ValueError:
+                    messagebox.showerror("Validation", "Quantity must be a number.", parent=dlg)
+                    return
+                entry["menge"] = new_menge
+                entry["remarks"] = new_remarks
+                self.save_kmat_excel()
+                self.update_list()
+                self.status_var.set(f"Entry updated: {entry.get('kauf', '')}/{entry.get('pos', '')}")
+                dlg.destroy()
+
+            menge_entry.focus_set()
+            menge_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
+            remarks_entry.bind("<Return>", lambda e: save_edit())
+
+        # Buttons row
+        btn_frame = ttk.Frame(frame)
+        btn_frame.grid(row=row, column=0, columnspan=2, pady=(12, 0))
+        ttk.Button(btn_frame, text="Save", command=save_edit).grid(row=0, column=0, padx=(0, 10))
+        ttk.Button(btn_frame, text="Cancel", command=dlg.destroy).grid(row=0, column=1)
+
+        # Center dialog on parent
+        dlg.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - dlg.winfo_width()) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - dlg.winfo_height()) // 2
+        dlg.geometry(f"+{x}+{y}")
+        dlg.wait_window()
 
     def _delete_entry(self, item_id):
         if not messagebox.askyesno("Confirm Delete",

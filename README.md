@@ -5,7 +5,7 @@
 Desktop application for warehouse inventory at **Forbo**.
 Supports **three warehouse modes**: **HALB**, **ZERT**, and **KMAT**.
 
-- Version: **2.2**
+- Version: **2.3**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 
@@ -119,11 +119,12 @@ Closing the dialog without a selection exits the application.
 ### HALB – Basic workflow
 
 1. **Scan a QR code or barcode**
-   - The scan field is always focused
+   - The scan field is always focused and displayed in large text for easy reading
    - Scan with the scanner or type the batch number manually, then press **ENTER**
 
 2. **Roll found**
-   - Roll data is displayed automatically (dimensions, area, free usable)
+   - Roll data is displayed first (dimensions, area, free usable)
+   - The input fields appear below the roll data
    - Enter the **Shelf Location** and press **ENTER** → cursor jumps to Measured Width
    - Enter the **Measured Width (mm)** and press **ENTER** → entry is saved automatically
    - Optionally add a **Remark** before saving
@@ -180,6 +181,26 @@ Locat;Charge;Lnge0;Brte0;Lnge1;Brte1;Lnge2;Brte2
 ```
 
 If the scanned value contains no semicolons, the entire string is treated as the batch number.
+
+### Editing an existing entry
+
+If a value was entered incorrectly (wrong shelf location, wrong width, wrong quantity, wrong remark), it can be corrected without deleting and re-scanning:
+
+1. **Right-click** the entry in the **SCANNED ITEMS** list
+2. Select **Edit entry** from the context menu
+3. A dialog opens with the current values pre-filled
+4. Correct the desired field(s) and click **Save**
+
+Editable fields per mode:
+
+| Mode | Editable fields |
+|------|----------------|
+| HALB | Shelf Location, Measured Width (mm), Remarks |
+| ZERT | Recorded Quantity, Remarks |
+| KMAT | Recorded Quantity, Remarks |
+
+The batch number / charge / order number is shown for reference but cannot be changed.
+The Excel file is updated automatically after saving.
 
 ### Keyboard Shortcuts
 
@@ -402,7 +423,7 @@ All activity is logged to `config/inventory_sk.log`:
 
 ### Duplicate warning appears unexpectedly
 - Check the scanned items list — the entry may already be recorded
-- Right-click the entry and select **Delete** if needed, then rescan
+- Right-click the entry and select **Edit entry** to correct it, or **Delete entry** to remove and rescan
 
 ### KMAT: Special stock number not found
 - Verify that the Special stock number exists in the KMAT master table
@@ -421,4 +442,4 @@ If problems persist:
 ---
 
 **Developed for Forbo Movement Systems**
-*Version 2.2 – March 2026*
+*Version 2.3 – May 2026*
