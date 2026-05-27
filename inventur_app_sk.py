@@ -10,7 +10,7 @@ Supports two warehouse modes: SK (Malacky) and Zert.
 Developed for Windows 11, Python 3.11+
 
 Date: Mai 2026
-Version: 2.3 SK+Zert
+Version: 2.4 SK+Zert
 """
 
 import tkinter as tk
@@ -39,13 +39,13 @@ class WarehouseSelectionDialog:
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Lager auswählen / Select Warehouse")
-        self.dialog.geometry("620x220")
+        self.dialog.geometry("640x310")
         self.dialog.resizable(False, False)
         self.dialog.grab_set()
         # Center on screen
         self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - 310
-        y = (self.dialog.winfo_screenheight() // 2) - 110
+        x = (self.dialog.winfo_screenwidth() // 2) - 320
+        y = (self.dialog.winfo_screenheight() // 2) - 155
         self.dialog.geometry(f"+{x}+{y}")
         self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
 
@@ -63,11 +63,11 @@ class WarehouseSelectionDialog:
             justify=tk.CENTER,
         ).pack(pady=(0, 20))
 
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
+        row1_frame = ttk.Frame(frame)
+        row1_frame.pack(pady=(0, 10))
 
         tk.Button(
-            btn_frame,
+            row1_frame,
             text="HALB",
             font=("Arial", 14, "bold"),
             bg="#1f4e79",
@@ -78,7 +78,7 @@ class WarehouseSelectionDialog:
         ).pack(side=tk.LEFT, padx=(0, 20))
 
         tk.Button(
-            btn_frame,
+            row1_frame,
             text="ZERT",
             font=("Arial", 14, "bold"),
             bg="#375623",
@@ -86,10 +86,13 @@ class WarehouseSelectionDialog:
             width=14,
             height=2,
             command=lambda: self._select("Zert"),
-        ).pack(side=tk.LEFT, padx=(0, 20))
+        ).pack(side=tk.LEFT)
+
+        row2_frame = ttk.Frame(frame)
+        row2_frame.pack()
 
         tk.Button(
-            btn_frame,
+            row2_frame,
             text="KMAT",
             font=("Arial", 14, "bold"),
             bg="#6b1f1f",
@@ -97,7 +100,18 @@ class WarehouseSelectionDialog:
             width=14,
             height=2,
             command=lambda: self._select("KMAT"),
-        ).pack(side=tk.LEFT, padx=(20, 0))
+        ).pack(side=tk.LEFT, padx=(0, 20))
+
+        tk.Button(
+            row2_frame,
+            text="WIP",
+            font=("Arial", 14, "bold"),
+            bg="#4a3728",
+            fg="white",
+            width=14,
+            height=2,
+            command=lambda: self._select("WIP"),
+        ).pack(side=tk.LEFT)
 
     def _select(self, mode):
         self.result = mode
@@ -121,7 +135,7 @@ class SettingsDialog:
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Settings")
-        self.dialog.geometry("620x580")
+        self.dialog.geometry("620x700")
         self.dialog.resizable(True, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -208,11 +222,35 @@ class SettingsDialog:
         ttk.Button(frame, text="Browse...", command=self._browse_kmat_export).grid(
             row=11, column=1, sticky=tk.W)
 
+        # --- WIP Master Table path ---
+        ttk.Label(frame, text="WIP Master Table:", font=("Arial", 10, "bold")).grid(
+            row=12, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.wip_master_path_var = tk.StringVar(
+            value=self.config.get("arbeitstabelle_wip_path", ""))
+        wip_master_entry = ttk.Entry(frame, textvariable=self.wip_master_path_var, width=55)
+        wip_master_entry.grid(row=13, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_wip_master).grid(
+            row=13, column=1, sticky=tk.W)
+
+        # --- WIP Export folder ---
+        ttk.Label(frame, text="WIP Export Folder:", font=("Arial", 10, "bold")).grid(
+            row=14, column=0, sticky=tk.W, pady=(16, 4))
+
+        self.wip_export_path_var = tk.StringVar(
+            value=self.config.get("export_wip_path", ""))
+        wip_export_entry = ttk.Entry(frame, textvariable=self.wip_export_path_var, width=55)
+        wip_export_entry.grid(row=15, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+
+        ttk.Button(frame, text="Browse...", command=self._browse_wip_export).grid(
+            row=15, column=1, sticky=tk.W)
+
         frame.columnconfigure(0, weight=1)
 
         # --- Buttons ---
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=12, column=0, columnspan=2, pady=(24, 0))
+        btn_frame.grid(row=16, column=0, columnspan=2, pady=(24, 0))
 
         ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(
             side=tk.LEFT, padx=(0, 12))
@@ -261,6 +299,19 @@ class SettingsDialog:
         if path:
             self.kmat_export_path_var.set(path)
 
+    def _browse_wip_master(self):
+        path = filedialog.askopenfilename(
+            title="Select WIP Master Table file",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+        if path:
+            self.wip_master_path_var.set(path)
+
+    def _browse_wip_export(self):
+        path = filedialog.askdirectory(title="Select WIP Export output folder")
+        if path:
+            self.wip_export_path_var.set(path)
+
     def _save(self):
         self.config["arbeitstabelle_path"] = self.master_path_var.get().strip()
         self.config["export_path"] = self.export_path_var.get().strip()
@@ -268,6 +319,8 @@ class SettingsDialog:
         self.config["export_zert_path"] = self.zert_export_path_var.get().strip()
         self.config["arbeitstabelle_kmat_path"] = self.kmat_master_path_var.get().strip()
         self.config["export_kmat_path"] = self.kmat_export_path_var.get().strip()
+        self.config["arbeitstabelle_wip_path"] = self.wip_master_path_var.get().strip()
+        self.config["export_wip_path"] = self.wip_export_path_var.get().strip()
         self.result = self.config
         self.dialog.destroy()
 
@@ -599,6 +652,69 @@ class PositionInputDialog:
 
 
 # ---------------------------------------------------------------------------
+# WIPOrderDialog
+# ---------------------------------------------------------------------------
+
+class WIPOrderDialog:
+    """Dialog to select Order for a scanned Sales Order."""
+
+    def __init__(self, parent, sales_order, orders):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Select Order")
+        self.dialog.geometry("400x200")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 80, parent.winfo_rooty() + 80)
+        )
+        self._sales_order = sales_order
+        self._orders = orders
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text=f"Sales Order: {self._sales_order}",
+                  font=("Arial", 12, "bold")).pack(pady=(0, 12))
+
+        ttk.Label(frame, text="Select Order:", font=("Arial", 10)).pack(anchor=tk.W)
+
+        self.order_var = tk.StringVar()
+        if self._orders:
+            self.order_var.set(self._orders[0])
+
+        combo = ttk.Combobox(frame, textvariable=self.order_var,
+                             values=self._orders, font=("Arial", 12), width=15,
+                             state="readonly" if self._orders else "normal")
+        combo.pack(pady=(4, 16), anchor=tk.W)
+        combo.focus_set()
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack()
+        ttk.Button(btn_frame, text="OK", command=self._ok, width=10).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=10).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Return>", lambda e: self._ok())
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _ok(self):
+        order = self.order_var.get().strip()
+        if not order:
+            messagebox.showerror("Error", "Please select an order.", parent=self.dialog)
+            return
+        self.result = order
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
 # NotFoundDialogKMAT
 # ---------------------------------------------------------------------------
 
@@ -739,6 +855,8 @@ class InventurAppSK:
             self.load_existing_zert()
         elif self.warehouse_mode == "KMAT":
             self.load_existing_kmat()
+        elif self.warehouse_mode == "WIP":
+            self.load_existing_wip()
         else:
             self.load_existing_cz()
 
@@ -789,6 +907,13 @@ class InventurAppSK:
         self.export_kmat_path = Path(kmat_exp) if kmat_exp else self.base_dir
         self.inventur_kmat_path = self.export_kmat_path / "Inventory_KMAT.xlsx"
 
+        # WIP paths
+        wip_arb = self.config.get("arbeitstabelle_wip_path", "")
+        self.arbeitstabelle_wip_path = Path(wip_arb) if wip_arb else None
+        wip_exp = self.config.get("export_wip_path", "")
+        self.export_wip_path = Path(wip_exp) if wip_exp else self.base_dir
+        self.inventur_wip_path = self.export_wip_path / "Inventory_WIP.xlsx"
+
     # ------------------------------------------------------------------
     # Logging
     # ------------------------------------------------------------------
@@ -823,6 +948,8 @@ class InventurAppSK:
             "export_zert_path": "",
             "arbeitstabelle_kmat_path": "",
             "export_kmat_path": "",
+            "arbeitstabelle_wip_path": "",
+            "export_wip_path": "",
         }
         try:
             if config_path.exists():
@@ -869,6 +996,10 @@ class InventurAppSK:
         self.df_kmat = None
         self.inventur_data_kmat = []
         self.not_found_data_kmat = []
+
+        # WIP data
+        self.inventur_data_wip = []
+        self.df_wip = None
 
     # ------------------------------------------------------------------
     # QR parsing
@@ -1006,6 +1137,47 @@ class InventurAppSK:
             self.df_kmat = None
 
     # ------------------------------------------------------------------
+    # Master table (WIP)
+    # ------------------------------------------------------------------
+
+    def load_arbeitstabelle_wip(self):
+        """Load WIP master table from the configured path."""
+        if self.arbeitstabelle_wip_path is None or not self.arbeitstabelle_wip_path.exists():
+            self.df_wip = None
+            self.logger.warning("WIP master table not loaded")
+            return
+        try:
+            self.df_wip = pd.read_excel(
+                self.arbeitstabelle_wip_path,
+                sheet_name=0,
+                dtype=str,
+            )
+
+            def _norm_num(x):
+                if x is None:
+                    return ""
+                s = str(x).strip()
+                if s in ("", "nan"):
+                    return ""
+                try:
+                    return str(int(float(s)))
+                except (ValueError, TypeError):
+                    return ""
+
+            if "Sales Order" in self.df_wip.columns:
+                self.df_wip["Sales Order"] = self.df_wip["Sales Order"].apply(_norm_num)
+            if "Order" in self.df_wip.columns:
+                self.df_wip["Order"] = self.df_wip["Order"].apply(_norm_num)
+
+            count = len(self.df_wip)
+            self.logger.info(f"WIP master table loaded: {count} rows")
+            self.status_var.set(f"WIP master table loaded: {count} entries")
+            self._update_header_info()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading WIP master table:\n{e}")
+            self.df_wip = None
+
+    # ------------------------------------------------------------------
     # Charge lookup (SK)
     # ------------------------------------------------------------------
 
@@ -1066,6 +1238,39 @@ class InventurAppSK:
             kauf_norm = str(kauf).strip()
         rows = self.df_kmat[self.df_kmat["Special stock number"] == kauf_norm]
         return rows["POS"].tolist()
+
+    def get_wip_orders(self, sales_order):
+        """Return list of unscanned Order strings for a given Sales Order."""
+        if self.df_wip is None:
+            return []
+        try:
+            sales_order_norm = str(int(float(str(sales_order).strip())))
+        except (ValueError, TypeError):
+            sales_order_norm = str(sales_order).strip()
+        rows = self.df_wip[self.df_wip["Sales Order"] == sales_order_norm]
+        all_orders = rows["Order"].tolist()
+        scanned = {d["order"] for d in self.inventur_data_wip}
+        return [o for o in all_orders if o not in scanned]
+
+    def suche_wip(self, sales_order, order):
+        """Look up by Sales Order + Order in df_wip. Returns row dict or None."""
+        if self.df_wip is None:
+            return None
+        try:
+            sales_order_norm = str(int(float(str(sales_order).strip())))
+        except (ValueError, TypeError):
+            sales_order_norm = str(sales_order).strip()
+        try:
+            order_norm = str(int(float(str(order).strip())))
+        except (ValueError, TypeError):
+            order_norm = str(order).strip()
+        matches = self.df_wip[
+            (self.df_wip["Sales Order"] == sales_order_norm) &
+            (self.df_wip["Order"] == order_norm)
+        ]
+        if not matches.empty:
+            return matches.iloc[0].to_dict()
+        return None
 
     # ------------------------------------------------------------------
     # Startup path check
@@ -1138,6 +1343,37 @@ class InventurAppSK:
                 self.config["export_kmat_path"] = str(self.base_dir)
                 self.save_config()
                 self._resolve_paths()
+        elif self.warehouse_mode == "WIP":
+            arb_missing = (
+                self.arbeitstabelle_wip_path is None
+                or not self.arbeitstabelle_wip_path.exists()
+            )
+            if arb_missing:
+                answer = messagebox.askyesno(
+                    "WIP Master Table Not Found",
+                    "The WIP master table has not been configured or could not be found.\n\nSearch now?",
+                )
+                if answer:
+                    path = filedialog.askopenfilename(
+                        title="Select WIP Master Table",
+                        filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    )
+                    if path:
+                        self.config["arbeitstabelle_wip_path"] = path
+                        self.save_config()
+                        self._resolve_paths()
+                        self.load_arbeitstabelle_wip()
+                    else:
+                        self._disable_scan("No WIP master table selected. Scanning disabled.")
+                else:
+                    self._disable_scan("WIP master table not configured. Scanning disabled.")
+            else:
+                self.load_arbeitstabelle_wip()
+
+            if not self.config.get("export_wip_path", ""):
+                self.config["export_wip_path"] = str(self.base_dir)
+                self.save_config()
+                self._resolve_paths()
         else:
             arb_missing = (
                 self.arbeitstabelle_path is None
@@ -1197,6 +1433,9 @@ class InventurAppSK:
             elif self.warehouse_mode == "KMAT":
                 self.load_arbeitstabelle_kmat()
                 messagebox.showinfo("Settings Saved", "Settings have been saved.\nKMAT master table reloaded.")
+            elif self.warehouse_mode == "WIP":
+                self.load_arbeitstabelle_wip()
+                messagebox.showinfo("Settings Saved", "Settings have been saved.\nWIP master table reloaded.")
             else:
                 self.load_arbeitstabelle()
                 messagebox.showinfo("Settings Saved", "Settings have been saved.\nMaster table reloaded.")
@@ -1214,6 +1453,8 @@ class InventurAppSK:
             self.root.title("INVENTORY Forbo - Zert Warehouse")
         elif self.warehouse_mode == "KMAT":
             self.root.title("INVENTORY Forbo - KMAT Warehouse")
+        elif self.warehouse_mode == "WIP":
+            self.root.title("INVENTORY Forbo - WIP Warehouse")
         else:
             self.root.title("INVENTORY Forbo SK - Malacky Warehouse Management")
         self.root.geometry("1280x820")
@@ -1256,6 +1497,9 @@ class InventurAppSK:
         elif self.warehouse_mode == "KMAT":
             fg_color = "#6b1f1f"
             header_text = "INVENTORY Forbo - KMAT Warehouse"
+        elif self.warehouse_mode == "WIP":
+            fg_color = "#4a3728"
+            header_text = "INVENTORY Forbo - WIP Warehouse"
         else:
             fg_color = "#1f4e79"
             header_text = "INVENTORY Forbo SK - Malacky Warehouse Management"
@@ -1285,6 +1529,11 @@ class InventurAppSK:
                 self.header_info_var.set(f"DB: {len(self.df_kmat)} entries in KMAT master table")
             else:
                 self.header_info_var.set("No KMAT master table loaded")
+        elif self.warehouse_mode == "WIP":
+            if self.df_wip is not None:
+                self.header_info_var.set(f"DB: {len(self.df_wip)} entries in WIP master table")
+            else:
+                self.header_info_var.set("No WIP master table loaded")
         else:
             if self.df_rollen is not None:
                 self.header_info_var.set(f"DB: {len(self.df_rollen)} rolls in master table")
@@ -1329,6 +1578,8 @@ class InventurAppSK:
         self._create_zert_input_panel()
         self._create_kmat_info_panel()
         self._create_kmat_input_panel()
+        self._create_wip_info_panel()
+        self._create_wip_input_panel()
 
         self.current_frame.grid_remove()
 
@@ -1623,6 +1874,72 @@ class InventurAppSK:
         save_btn.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
         self.kmat_input_widgets["save_button"] = save_btn
 
+    def _create_wip_info_panel(self):
+        """Create info display panel for WIP mode (initially hidden)."""
+        self.wip_info_container = ttk.Frame(self.current_frame)
+        wip_info = ttk.LabelFrame(self.wip_info_container, text="WIP DETAILS", padding="8")
+        wip_info.pack(fill=tk.X)
+
+        wip_info.columnconfigure(1, weight=1)
+        wip_info.columnconfigure(3, weight=1)
+
+        ttk.Label(wip_info, text="Sales Order:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_sales_order = ttk.Label(wip_info, text="", font=("Arial", 10, "bold"))
+        self.wip_lbl_sales_order.grid(row=0, column=1, sticky=tk.W, padx=(8, 20), pady=3)
+
+        ttk.Label(wip_info, text="Order:", font=("Arial", 9)).grid(row=0, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_order = ttk.Label(wip_info, text="", font=("Arial", 10, "bold"))
+        self.wip_lbl_order.grid(row=0, column=3, sticky=tk.W, padx=(8, 0), pady=3)
+
+        ttk.Label(wip_info, text="Material No.:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_material = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_material.grid(row=1, column=1, sticky=tk.W, padx=(8, 20), pady=3)
+
+        ttk.Label(wip_info, text="Plant:", font=("Arial", 9)).grid(row=1, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_werk = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_werk.grid(row=1, column=3, sticky=tk.W, padx=(8, 0), pady=3)
+
+        ttk.Label(wip_info, text="Description:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_kurztext = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_kurztext.grid(row=2, column=1, columnspan=3, sticky=tk.W, padx=(8, 0), pady=3)
+
+        ttk.Label(wip_info, text="Order Qty:", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_order_qty = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_order_qty.grid(row=3, column=1, sticky=tk.W, padx=(8, 20), pady=3)
+
+        ttk.Label(wip_info, text="UOM:", font=("Arial", 9)).grid(row=3, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_bme = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_bme.grid(row=3, column=3, sticky=tk.W, padx=(8, 0), pady=3)
+
+        ttk.Label(wip_info, text="Basic Finish:", font=("Arial", 9)).grid(row=4, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_basic_finish = ttk.Label(wip_info, text="", font=("Arial", 10))
+        self.wip_lbl_basic_finish.grid(row=4, column=1, sticky=tk.W, padx=(8, 20), pady=3)
+
+    def _create_wip_input_panel(self):
+        """Create input panel for WIP mode."""
+        self.wip_input_container = ttk.Frame(self.current_frame)
+        wip_input = ttk.LabelFrame(self.wip_input_container, text="INPUT", padding="8")
+        wip_input.pack(fill=tk.X)
+
+        self.wip_menge_var = tk.StringVar()
+        self.wip_remarks_var = tk.StringVar()
+        self.wip_input_widgets = {}
+
+        ttk.Label(wip_input, text="Recorded Quantity *:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=4)
+        menge_e = ttk.Entry(wip_input, textvariable=self.wip_menge_var, width=15, font=("Arial", 12))
+        menge_e.grid(row=0, column=1, sticky=tk.W, padx=(8, 8), pady=4)
+        self.wip_input_widgets["menge_entry"] = menge_e
+
+        ttk.Label(wip_input, text="Stk", font=("Arial", 10)).grid(row=0, column=2, sticky=tk.W, pady=4)
+
+        ttk.Label(wip_input, text="Remarks:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(wip_input, textvariable=self.wip_remarks_var, width=30, font=("Arial", 10)).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0), pady=4)
+
+        ttk.Button(wip_input, text="SAVE (Enter)", command=self.save_current_scan_wip, width=16).grid(
+            row=2, column=0, columnspan=3, pady=(8, 0))
+
+        menge_e.bind("<Return>", self.save_current_scan_wip)
+
     def _show_sk_widgets(self):
         """Show SK-specific widgets, hide Zert and KMAT widgets."""
         # Show SK rows 0-7
@@ -1660,12 +1977,23 @@ class InventurAppSK:
         self.kmat_input_container.grid(row=1, column=0, columnspan=4,
                                         sticky=(tk.W, tk.E), pady=4)
 
+    def _show_wip_widgets(self):
+        """Show WIP-specific widgets, hide SK and Zert and KMAT widgets."""
+        for widget in self.current_frame.grid_slaves():
+            widget.grid_remove()
+        self.wip_info_container.grid(row=0, column=0, columnspan=4,
+                                     sticky=(tk.W, tk.E), pady=(0, 8))
+        self.wip_input_container.grid(row=1, column=0, columnspan=4,
+                                      sticky=(tk.W, tk.E), pady=4)
+
     def _hide_all_scan_widgets(self):
         """Hide all scan detail widgets."""
         self.zert_info_container.grid_remove()
         self.zert_input_container.grid_remove()
         self.kmat_info_container.grid_remove()
         self.kmat_input_container.grid_remove()
+        self.wip_info_container.grid_remove()
+        self.wip_input_container.grid_remove()
         self.input_container.grid_remove()
 
     # --- List section ---
@@ -1687,6 +2015,8 @@ class InventurAppSK:
             columns = ("Time", "Charge", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "KMAT":
             columns = ("Time", "Kauf-Nr.", "POS", "Material No.", "Description", "Quantity", "UOM", "Status")
+        elif self.warehouse_mode == "WIP":
+            columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM")
         else:
             columns = ("Time", "Batch No.", "Material", "Shelf Location", "Status")
 
@@ -1712,6 +2042,14 @@ class InventurAppSK:
             self.tree.column("Quantity", width=80, minwidth=60)
             self.tree.column("UOM", width=60, minwidth=50)
             self.tree.column("Status", width=80, minwidth=60)
+        elif self.warehouse_mode == "WIP":
+            self.tree.column("Time", width=80, minwidth=70)
+            self.tree.column("Sales Order", width=110, minwidth=80)
+            self.tree.column("Order", width=90, minwidth=70)
+            self.tree.column("Material No.", width=100, minwidth=80)
+            self.tree.column("Description", width=200, minwidth=120)
+            self.tree.column("Quantity", width=80, minwidth=60)
+            self.tree.column("UOM", width=60, minwidth=50)
         else:
             self.tree.column("Time", width=90, minwidth=70)
             self.tree.column("Batch No.", width=130, minwidth=100)
@@ -1843,6 +2181,30 @@ class InventurAppSK:
                 messagebox.showerror(
                     "Position Not Found",
                     f"Position '{pos}' for Kundenauftrag '{kauf}' was not found.",
+                )
+                self._reset_scan()
+        elif self.warehouse_mode == "WIP":
+            sales_order = raw.strip()
+            orders = self.get_wip_orders(sales_order)
+            if not orders:
+                messagebox.showerror(
+                    "Sales Order nicht gefunden / alle erfasst",
+                    f"Sales Order '{sales_order}' wurde nicht gefunden oder alle Orders wurden bereits erfasst.",
+                )
+                self._reset_scan()
+                return
+            order_dlg = WIPOrderDialog(self.root, sales_order, orders)
+            if order_dlg.result is None:
+                self._reset_scan()
+                return
+            order = order_dlg.result
+            row_data = self.suche_wip(sales_order, order)
+            if row_data is not None:
+                self.show_found_wip(row_data, sales_order, order)
+            else:
+                messagebox.showerror(
+                    "Order nicht gefunden",
+                    f"Order '{order}' für Sales Order '{sales_order}' wurde nicht gefunden.",
                 )
                 self._reset_scan()
         else:
@@ -2047,6 +2409,51 @@ class InventurAppSK:
 
         self.scan_var.set("")
         self.status_var.set(f"KMAT found: {self.current_scan['kurztext']} | Enter quantity")
+
+    # ------------------------------------------------------------------
+    # Show found WIP item
+    # ------------------------------------------------------------------
+
+    def show_found_wip(self, row_data, sales_order, order):
+        """Display found WIP data and show WIP input panel."""
+        def _s(val):
+            if val is None:
+                return ""
+            s = str(val)
+            return "" if s.lower() == "nan" else s
+
+        self.current_scan = {
+            "sales_order": sales_order,
+            "order": order,
+            "material": _s(row_data.get("Material Number", "")),
+            "kurztext": _s(row_data.get("Material description", "")),
+            "werk": _s(row_data.get("Plant", "")),
+            "bme": _s(row_data.get("Unit of measure (=GMEIN)", "")),
+            "order_qty": _s(row_data.get("Order quantity (GMEIN)", "")),
+            "basic_finish": _s(row_data.get("Basic finish date", "")),
+            "status": "found",
+            "_mode": "wip",
+        }
+
+        self.wip_lbl_sales_order.config(text=self.current_scan["sales_order"])
+        self.wip_lbl_order.config(text=self.current_scan["order"])
+        self.wip_lbl_material.config(text=self.current_scan["material"])
+        self.wip_lbl_kurztext.config(text=self.current_scan["kurztext"])
+        self.wip_lbl_werk.config(text=self.current_scan["werk"])
+        self.wip_lbl_bme.config(text=self.current_scan["bme"])
+        self.wip_lbl_order_qty.config(text=self.current_scan["order_qty"])
+        self.wip_lbl_basic_finish.config(text=self.current_scan["basic_finish"])
+
+        self.current_frame.config(text="WIP FOUND")
+        self.current_frame.grid()
+        self._show_wip_widgets()
+
+        self.wip_menge_var.set("")
+        self.wip_remarks_var.set("")
+        self.wip_input_widgets["menge_entry"].focus_set()
+
+        self.scan_var.set("")
+        self.status_var.set(f"WIP found: {self.current_scan['kurztext']} | Enter quantity")
 
     # ------------------------------------------------------------------
     # Not found dialog (SK)
@@ -2294,6 +2701,45 @@ class InventurAppSK:
         self._reset_scan()
 
     # ------------------------------------------------------------------
+    # Save current scan (WIP)
+    # ------------------------------------------------------------------
+
+    def save_current_scan_wip(self, event=None):
+        """Validate and save the current found WIP item."""
+        if not self.current_scan or self.current_scan.get("_mode") != "wip":
+            return
+
+        menge = self.wip_menge_var.get().strip()
+        if not menge:
+            messagebox.showwarning("Required Field", "Recorded Quantity is mandatory.")
+            self.wip_input_widgets["menge_entry"].focus_set()
+            return
+
+        self.current_scan["menge"] = menge
+        self.current_scan["remarks"] = self.wip_remarks_var.get().strip()
+        self.current_scan["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+        self.inventur_data_wip.append(self.current_scan.copy())
+
+        self.undo_stack.append(("add_wip", self.current_scan.copy()))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+
+        if self.config.get("auto_save", True):
+            self.save_wip_excel()
+
+        self.update_list()
+        self.status_var.set(
+            f"WIP saved. Total: {len(self.inventur_data_wip)} entries"
+        )
+        self.logger.info(f"WIP scan saved: {self.current_scan['sales_order']}/{self.current_scan['order']}")
+
+        self.current_frame.grid_remove()
+        self._hide_all_scan_widgets()
+        self.current_scan = None
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
     # Reset scan
     # ------------------------------------------------------------------
 
@@ -2312,6 +2758,10 @@ class InventurAppSK:
             self.kmat_menge_var.set("")
         if hasattr(self, "kmat_remarks_var"):
             self.kmat_remarks_var.set("")
+        if hasattr(self, "wip_menge_var"):
+            self.wip_menge_var.set("")
+        if hasattr(self, "wip_remarks_var"):
+            self.wip_remarks_var.set("")
         self.current_frame.grid_remove()
         self.scan_entry.focus_set()
         self.status_var.set("Ready to scan...")
@@ -2385,6 +2835,27 @@ class InventurAppSK:
                 text=f"{total} entries ({len(self.inventur_data_kmat)} found, "
                      f"{len(self.not_found_data_kmat)} not found)"
             )
+        elif self.warehouse_mode == "WIP":
+            all_items = [(d, "Found") for d in self.inventur_data_wip]
+            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+
+            for d, status in all_items:
+                ts = d.get("zeitstempel", "")
+                time_part = ts.split(" ")[1] if " " in ts else ts
+                self.tree.insert(
+                    "", "end",
+                    values=(
+                        time_part,
+                        d.get("sales_order", ""),
+                        d.get("order", ""),
+                        d.get("material", ""),
+                        d.get("kurztext", ""),
+                        d.get("menge", ""),
+                        d.get("bme", ""),
+                    ),
+                )
+
+            self.count_label.config(text=f"{len(self.inventur_data_wip)} entries")
         else:
             all_items = []
             for d in self.inventur_data:
@@ -2646,6 +3117,63 @@ class InventurAppSK:
             self.logger.error(f"Error saving KMAT Excel: {e}")
 
     # ------------------------------------------------------------------
+    # Excel save (WIP)
+    # ------------------------------------------------------------------
+
+    WIP_HEADERS = [
+        "Timestamp",
+        "Plant",
+        "Sales Order",
+        "Order",
+        "Material No.",
+        "Description",
+        "UOM",
+        "Order Qty",
+        "Recorded Quantity",
+        "Remarks",
+    ]
+
+    def _row_from_wip_item(self, d):
+        def _clean(v):
+            if v is None:
+                return ""
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return [
+            _clean(d.get("zeitstempel", "")),
+            _clean(d.get("werk", "")),
+            _clean(d.get("sales_order", "")),
+            _clean(d.get("order", "")),
+            _clean(d.get("material", "")),
+            _clean(d.get("kurztext", "")),
+            _clean(d.get("bme", "")),
+            _clean(d.get("order_qty", "")),
+            _clean(d.get("menge", "")),
+            _clean(d.get("remarks", "")),
+        ]
+
+    def save_wip_excel(self):
+        """Write Inventory_WIP.xlsx with Inventory sheet."""
+        try:
+            wb = Workbook()
+            if "Sheet" in wb.sheetnames:
+                wb.remove(wb["Sheet"])
+
+            ws_inv = wb.create_sheet("Inventory")
+            ws_inv.append(self.WIP_HEADERS)
+            for d in self.inventur_data_wip:
+                ws_inv.append(self._row_from_wip_item(d))
+
+            self.export_wip_path.mkdir(parents=True, exist_ok=True)
+            wb.save(self.inventur_wip_path)
+            self.logger.info(f"WIP Excel saved: {self.inventur_wip_path}")
+
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Error saving WIP Excel file:\n{e}")
+            self.logger.error(f"Error saving WIP Excel: {e}")
+
+    # ------------------------------------------------------------------
     # Load existing session (SK)
     # ------------------------------------------------------------------
 
@@ -2843,6 +3371,56 @@ class InventurAppSK:
         }
 
     # ------------------------------------------------------------------
+    # Load existing session (WIP)
+    # ------------------------------------------------------------------
+
+    def load_existing_wip(self):
+        """Resume a previous WIP session by loading Inventory_WIP.xlsx."""
+        if not self.inventur_wip_path.exists():
+            return
+
+        loaded = 0
+        try:
+            df_inv = pd.read_excel(
+                self.inventur_wip_path, sheet_name="Inventory",
+                dtype={"Sales Order": str, "Order": str})
+            for _, row in df_inv.iterrows():
+                self.inventur_data_wip.append(self._row_to_wip_dict(row, status="found"))
+                loaded += 1
+        except Exception as e:
+            self.logger.error(f"Error loading WIP Inventory sheet: {e}")
+
+        if loaded:
+            self.update_list()
+            self.status_var.set(f"WIP session resumed: {len(self.inventur_data_wip)} entries.")
+            self.logger.info(f"Existing WIP session loaded: {loaded} rows")
+
+    def _row_to_wip_dict(self, row, status):
+        def _str(v):
+            try:
+                if pd.isna(v):
+                    return ""
+            except (TypeError, ValueError):
+                pass
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return {
+            "zeitstempel": _str(row.get("Timestamp", "")),
+            "werk": _str(row.get("Plant", "")),
+            "sales_order": _str(row.get("Sales Order", "")),
+            "order": _str(row.get("Order", "")),
+            "material": _str(row.get("Material No.", "")),
+            "kurztext": _str(row.get("Description", "")),
+            "bme": _str(row.get("UOM", "")),
+            "order_qty": _str(row.get("Order Qty", "")),
+            "menge": _str(row.get("Recorded Quantity", "")),
+            "remarks": _str(row.get("Remarks", "")),
+            "status": status,
+            "_mode": "wip",
+        }
+
+    # ------------------------------------------------------------------
     # Export / Backup
     # ------------------------------------------------------------------
 
@@ -2880,6 +3458,21 @@ class InventurAppSK:
                     self.logger.info(f"KMAT backup created: {backup_file}")
                 else:
                     messagebox.showwarning("Warning", "No KMAT data file to backup yet.")
+            elif self.warehouse_mode == "WIP":
+                self.save_wip_excel()
+                backup_dir = self.export_wip_path / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / f"Inventory_WIP_Backup_{timestamp}.xlsx"
+                source_file = self.inventur_wip_path
+                if source_file.exists():
+                    shutil.copy2(source_file, backup_file)
+                    messagebox.showinfo(
+                        "Backup Created",
+                        f"Backup saved to:\n{backup_file}",
+                    )
+                    self.logger.info(f"WIP backup created: {backup_file}")
+                else:
+                    messagebox.showwarning("Warning", "No WIP data file to backup yet.")
             else:
                 self.save_cz_excel()
                 backup_dir = self.export_path / "backups"
@@ -3251,6 +3844,8 @@ class InventurAppSK:
             self.save_zert_excel()
         elif self.warehouse_mode == "KMAT":
             self.save_kmat_excel()
+        elif self.warehouse_mode == "WIP":
+            self.save_wip_excel()
         else:
             self.save_cz_excel()
         self.status_var.set("Manually saved.")

@@ -3,9 +3,9 @@
 ## Overview
 
 Desktop application for warehouse inventory at **Forbo**.
-Supports **three warehouse modes**: **HALB**, **ZERT**, and **KMAT**.
+Supports **four warehouse modes**: **HALB**, **ZERT**, **KMAT**, and **WIP**.
 
-- Version: **2.3**
+- Version: **2.4**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 
@@ -84,9 +84,29 @@ On first launch the program will ask you to locate the relevant file.
 
 > One Special stock number can have multiple positions. The combination of Special stock number + POS uniquely identifies a product.
 
+**Required columns – WIP master table:**
+
+| Column | Description |
+|--------|-------------|
+| `Plant` | Plant |
+| `Sales Order` | Sales order number (scanned by the user) |
+| `Sales Order Item` | Sales order item |
+| `Order` | Manufacturing order number (unique, selected from dropdown) |
+| `Material Number` | Material number |
+| `Material description` | Material description |
+| `Quantity Delivered (GMEIN)` | Delivered quantity |
+| `Unit of measure (=GMEIN)` | Unit of measure |
+| `Basic finish date` | Planned finish date |
+| `Order quantity (GMEIN)` | Order quantity |
+| `System Status` | Current system status |
+
+> The WIP master table must be provided as a single-sheet Excel file (.xlsx). The program always reads the **first sheet**, regardless of its name.
+
+> One Sales Order can contain multiple Orders. Each Order number is unique across the entire master table.
+
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
-2. The warehouse selection dialog opens — select **HALB**, **ZERT**, or **KMAT**
+2. The warehouse selection dialog opens — select **HALB**, **ZERT**, **KMAT**, or **WIP**
 3. The application opens maximised automatically
 
 ---
@@ -102,13 +122,14 @@ Settings are saved to `config/settings_sk.json`.
 
 ## Warehouse Selection
 
-Every time the application starts, a selection dialog appears:
+Every time the application starts, a selection dialog appears with four buttons arranged in two rows:
 
 | Button | Description |
 |--------|-------------|
 | **HALB** | Forbo HALB – Malacky warehouse (Rolls, Fach + Width input) |
 | **ZERT** | ZERT warehouse (Charge-based, quantity input only) |
 | **KMAT** | KMAT warehouse (Customer order + Position, quantity input) |
+| **WIP** | WIP warehouse (Sales Order + Order selection, quantity input) |
 
 Closing the dialog without a selection exits the application.
 
@@ -172,6 +193,26 @@ Closing the dialog without a selection exits the application.
 4. **Duplicate protection**
    - The combination of Special stock number + POS is checked — re-scanning the same combination is blocked
 
+### WIP – Basic workflow
+
+1. **Scan a barcode**
+   - The scanner reads the **Sales Order** number, e.g. `16494221`
+   - If the Sales Order does not exist in the master table, or all its Orders have already been recorded, an error message is shown
+
+2. **Select Order**
+   - A dialog opens automatically showing all **not yet recorded** Orders for that Sales Order
+   - Select the correct **Order** from the dropdown and click **OK**
+   - Already recorded Orders are automatically hidden from the list
+   - Scanning the same Sales Order again will only show the remaining unrecorded Orders
+
+3. **Product found**
+   - Product data is displayed (Material No., Description, Plant, Order Qty, UOM, Basic Finish Date)
+   - Enter the **Recorded Quantity** (mandatory) and press **ENTER** or click **Save**
+   - Optionally add a **Remark** before saving
+
+4. **Duplicate protection**
+   - Each Order number is unique — once recorded it no longer appears in the dropdown
+
 ### QR Code Format (HALB and ZERT modes)
 
 The program parses semicolon-delimited QR codes:
@@ -198,6 +239,7 @@ Editable fields per mode:
 | HALB | Shelf Location, Measured Width (mm), Remarks |
 | ZERT | Recorded Quantity, Remarks |
 | KMAT | Recorded Quantity, Remarks |
+| WIP  | Recorded Quantity, Remarks |
 
 The batch number / charge / order number is shown for reference but cannot be changed.
 The Excel file is updated automatically after saving.
@@ -292,6 +334,27 @@ The Excel file is updated automatically after saving.
 | Recorded Quantity | Quantity entered during scan |
 | Remarks | Optional remark |
 
+### WIP: `Inventory_WIP.xlsx`
+
+| Sheet | Content |
+|-------|---------|
+| `Inventory` | All recorded WIP entries |
+
+**Column structure:**
+
+| Column | Description |
+|--------|-------------|
+| Timestamp | Date and time of scan |
+| Plant | Plant code |
+| Sales Order | Sales order number (scanned) |
+| Order | Manufacturing order number (selected from dropdown) |
+| Material No. | Material number |
+| Description | Material description |
+| UOM | Unit of measure |
+| Order Qty | Order quantity from master table |
+| Recorded Quantity | Quantity entered during scan |
+| Remarks | Optional remark |
+
 ---
 
 ## Auto-Save
@@ -308,6 +371,7 @@ Click **Export / Backup** to create a timestamped copy of the current inventory 
 - HALB mode: `backups/Inventory_HALB_Backup_YYYYMMDD_HHMMSS.xlsx`
 - ZERT mode: `backups/Inventory_ZERT_Backup_YYYYMMDD_HHMMSS.xlsx`
 - KMAT mode: `backups/Inventory_KMAT_Backup_YYYYMMDD_HHMMSS.xlsx`
+- WIP mode:  `backups/Inventory_WIP_Backup_YYYYMMDD_HHMMSS.xlsx`
 
 The original file is not modified.
 
@@ -339,14 +403,16 @@ inventur-programm-f/
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This documentation
 ├── icon.ico                  # Application icon (optional)
-├── Inventory_HALB.xlsx   # HALB inventory output (auto-created)
+├── Inventory_HALB.xlsx       # HALB inventory output (auto-created)
 ├── Inventory_ZERT.xlsx       # ZERT inventory output (auto-created)
 ├── Inventory_KMAT.xlsx       # KMAT inventory output (auto-created)
+├── Inventory_WIP.xlsx        # WIP inventory output (auto-created)
 ├── backups/                  # Timestamped backup files
-├── data/
-│   ├── Arbeitstabelle_Rollen_St012.XLSX   # HALB master table
-│   ├── Arbeitstabelle_ZERT_v2.xlsx        # ZERT master table
-│   └── Arbeitstabelle_KMAT.xlsx           # KMAT master table
+├── Daten/
+│   ├── Arbeitstabelle_Rollen_St012_EN.XLSX   # HALB master table
+│   ├── Arbeitstabelle_ZERT_EN.xlsx           # ZERT master table
+│   ├── Arbeitstabelle_KMAT_EN.xlsx           # KMAT master table
+│   └── Arbeitstabelle_WIP.xlsx               # WIP master table
 └── config/
     ├── settings_sk.json      # Application settings
     └── inventory_sk.log      # Log file
@@ -367,6 +433,8 @@ Settings file: `config/settings_sk.json`
   "export_zert_path": "C:/path/to/zert/output/folder",
   "arbeitstabelle_kmat_path": "C:/path/to/kmat_master_table.xlsx",
   "export_kmat_path": "C:/path/to/kmat/output/folder",
+  "arbeitstabelle_wip_path": "C:/path/to/wip_master_table.xlsx",
+  "export_wip_path": "C:/path/to/wip/output/folder",
   "vollbild": true
 }
 ```
@@ -380,6 +448,8 @@ Settings file: `config/settings_sk.json`
 | `export_zert_path` | Folder for ZERT inventory file and backups |
 | `arbeitstabelle_kmat_path` | Full path to the KMAT master table Excel file |
 | `export_kmat_path` | Folder for KMAT inventory file and backups |
+| `arbeitstabelle_wip_path` | Full path to the WIP master table Excel file |
+| `export_wip_path` | Folder for WIP inventory file and backups |
 | `vollbild` | Start maximised (`true` recommended) |
 
 ---
@@ -391,7 +461,7 @@ All activity is logged to `config/inventory_sk.log`:
 - Application start / stop
 - Warehouse mode selected
 - Master table load results
-- Every scanned batch number / Kaufnummer
+- Every scanned batch number / Sales Order / Kaufnummer
 - Errors and warnings
 
 ---
@@ -430,6 +500,12 @@ All activity is logged to `config/inventory_sk.log`:
 - Make sure the correct master table file is configured in Settings
 - No manual entry is possible in KMAT mode — only entries present in the master table can be recorded
 
+### WIP: Sales Order not found / no orders shown
+- Verify that the Sales Order number exists in the WIP master table
+- If all Orders under that Sales Order have already been recorded, the error "alle Orders wurden bereits erfasst" is shown — this is correct behaviour
+- Make sure the correct WIP master table file is configured in Settings
+- The program reads the **first sheet** of the Excel file regardless of its name
+
 ---
 
 ## Support
@@ -442,4 +518,4 @@ If problems persist:
 ---
 
 **Developed for Forbo Movement Systems**
-*Version 2.3 – May 2026*
+*Version 2.4 – May 2026*
