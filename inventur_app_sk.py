@@ -10,7 +10,7 @@ Supports two warehouse modes: SK (Malacky) and Zert.
 Developed for Windows 11, Python 3.11+
 
 Date: Mai 2026
-Version: 2.4 SK+Zert
+Version: 2.5 SK+Zert
 """
 
 import tkinter as tk
@@ -599,7 +599,7 @@ class PositionInputDialog:
         self.result = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Select Position")
-        self.dialog.geometry("400x200")
+        self.dialog.geometry("600x350")
         self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -608,6 +608,7 @@ class PositionInputDialog:
         )
         self._kauf = kauf
         self._positions = positions
+        self.dialog.option_add('*TCombobox*Listbox.font', ('Arial', 24))
         self._build_widgets()
         self.dialog.wait_window()
 
@@ -616,16 +617,16 @@ class PositionInputDialog:
         frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frame, text=f"Kauf-Nr.: {self._kauf}",
-                  font=("Arial", 12, "bold")).pack(pady=(0, 12))
+                  font=("Arial", 24, "bold")).pack(pady=(0, 12))
 
-        ttk.Label(frame, text="Select Position:", font=("Arial", 10)).pack(anchor=tk.W)
+        ttk.Label(frame, text="Select Position:", font=("Arial", 20)).pack(anchor=tk.W)
 
         self.pos_var = tk.StringVar()
         if self._positions:
             self.pos_var.set(self._positions[0])
 
         combo = ttk.Combobox(frame, textvariable=self.pos_var,
-                             values=self._positions, font=("Arial", 12), width=15,
+                             values=self._positions, font=("Arial", 24), width=15,
                              state="readonly" if self._positions else "normal")
         combo.pack(pady=(4, 16), anchor=tk.W)
         combo.focus_set()
@@ -662,7 +663,7 @@ class WIPOrderDialog:
         self.result = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Select Order")
-        self.dialog.geometry("400x200")
+        self.dialog.geometry("600x350")
         self.dialog.resizable(False, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -671,6 +672,7 @@ class WIPOrderDialog:
         )
         self._sales_order = sales_order
         self._orders = orders
+        self.dialog.option_add('*TCombobox*Listbox.font', ('Arial', 24))
         self._build_widgets()
         self.dialog.wait_window()
 
@@ -679,16 +681,16 @@ class WIPOrderDialog:
         frame.pack(fill=tk.BOTH, expand=True)
 
         ttk.Label(frame, text=f"Sales Order: {self._sales_order}",
-                  font=("Arial", 12, "bold")).pack(pady=(0, 12))
+                  font=("Arial", 24, "bold")).pack(pady=(0, 12))
 
-        ttk.Label(frame, text="Select Order:", font=("Arial", 10)).pack(anchor=tk.W)
+        ttk.Label(frame, text="Select Order:", font=("Arial", 20)).pack(anchor=tk.W)
 
         self.order_var = tk.StringVar()
         if self._orders:
             self.order_var.set(self._orders[0])
 
         combo = ttk.Combobox(frame, textvariable=self.order_var,
-                             values=self._orders, font=("Arial", 12), width=15,
+                             values=self._orders, font=("Arial", 24), width=15,
                              state="readonly" if self._orders else "normal")
         combo.pack(pady=(4, 16), anchor=tk.W)
         combo.focus_set()
@@ -1883,36 +1885,36 @@ class InventurAppSK:
         wip_info.columnconfigure(1, weight=1)
         wip_info.columnconfigure(3, weight=1)
 
-        ttk.Label(wip_info, text="Sales Order:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=3)
-        self.wip_lbl_sales_order = ttk.Label(wip_info, text="", font=("Arial", 10, "bold"))
+        ttk.Label(wip_info, text="Sales Order:", font=("Arial", 18)).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_sales_order = ttk.Label(wip_info, text="", font=("Arial", 20, "bold"))
         self.wip_lbl_sales_order.grid(row=0, column=1, sticky=tk.W, padx=(8, 20), pady=3)
 
-        ttk.Label(wip_info, text="Order:", font=("Arial", 9)).grid(row=0, column=2, sticky=tk.W, pady=3)
-        self.wip_lbl_order = ttk.Label(wip_info, text="", font=("Arial", 10, "bold"))
+        ttk.Label(wip_info, text="Order:", font=("Arial", 18)).grid(row=0, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_order = ttk.Label(wip_info, text="", font=("Arial", 20, "bold"))
         self.wip_lbl_order.grid(row=0, column=3, sticky=tk.W, padx=(8, 0), pady=3)
 
-        ttk.Label(wip_info, text="Material No.:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=3)
-        self.wip_lbl_material = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="Material No.:", font=("Arial", 18)).grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_material = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_material.grid(row=1, column=1, sticky=tk.W, padx=(8, 20), pady=3)
 
-        ttk.Label(wip_info, text="Plant:", font=("Arial", 9)).grid(row=1, column=2, sticky=tk.W, pady=3)
-        self.wip_lbl_werk = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="Plant:", font=("Arial", 18)).grid(row=1, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_werk = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_werk.grid(row=1, column=3, sticky=tk.W, padx=(8, 0), pady=3)
 
-        ttk.Label(wip_info, text="Description:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=3)
-        self.wip_lbl_kurztext = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="Description:", font=("Arial", 18)).grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_kurztext = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_kurztext.grid(row=2, column=1, columnspan=3, sticky=tk.W, padx=(8, 0), pady=3)
 
-        ttk.Label(wip_info, text="Order Qty:", font=("Arial", 9)).grid(row=3, column=0, sticky=tk.W, pady=3)
-        self.wip_lbl_order_qty = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="Order Qty:", font=("Arial", 18)).grid(row=3, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_order_qty = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_order_qty.grid(row=3, column=1, sticky=tk.W, padx=(8, 20), pady=3)
 
-        ttk.Label(wip_info, text="UOM:", font=("Arial", 9)).grid(row=3, column=2, sticky=tk.W, pady=3)
-        self.wip_lbl_bme = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="UOM:", font=("Arial", 18)).grid(row=3, column=2, sticky=tk.W, pady=3)
+        self.wip_lbl_bme = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_bme.grid(row=3, column=3, sticky=tk.W, padx=(8, 0), pady=3)
 
-        ttk.Label(wip_info, text="Basic Finish:", font=("Arial", 9)).grid(row=4, column=0, sticky=tk.W, pady=3)
-        self.wip_lbl_basic_finish = ttk.Label(wip_info, text="", font=("Arial", 10))
+        ttk.Label(wip_info, text="Basic Finish:", font=("Arial", 18)).grid(row=4, column=0, sticky=tk.W, pady=3)
+        self.wip_lbl_basic_finish = ttk.Label(wip_info, text="", font=("Arial", 20))
         self.wip_lbl_basic_finish.grid(row=4, column=1, sticky=tk.W, padx=(8, 20), pady=3)
 
     def _create_wip_input_panel(self):
@@ -1925,15 +1927,15 @@ class InventurAppSK:
         self.wip_remarks_var = tk.StringVar()
         self.wip_input_widgets = {}
 
-        ttk.Label(wip_input, text="Recorded Quantity *:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=4)
-        menge_e = ttk.Entry(wip_input, textvariable=self.wip_menge_var, width=15, font=("Arial", 12))
+        ttk.Label(wip_input, text="Recorded Quantity *:", font=("Arial", 20)).grid(row=0, column=0, sticky=tk.W, pady=4)
+        menge_e = ttk.Entry(wip_input, textvariable=self.wip_menge_var, width=15, font=("Arial", 24))
         menge_e.grid(row=0, column=1, sticky=tk.W, padx=(8, 8), pady=4)
         self.wip_input_widgets["menge_entry"] = menge_e
 
-        ttk.Label(wip_input, text="Stk", font=("Arial", 10)).grid(row=0, column=2, sticky=tk.W, pady=4)
+        ttk.Label(wip_input, text="Stk", font=("Arial", 20)).grid(row=0, column=2, sticky=tk.W, pady=4)
 
-        ttk.Label(wip_input, text="Remarks:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(wip_input, textvariable=self.wip_remarks_var, width=30, font=("Arial", 10)).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0), pady=4)
+        ttk.Label(wip_input, text="Remarks:", font=("Arial", 20)).grid(row=1, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(wip_input, textvariable=self.wip_remarks_var, width=30, font=("Arial", 20)).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0), pady=4)
 
         ttk.Button(wip_input, text="SAVE (Enter)", command=self.save_current_scan_wip, width=16).grid(
             row=2, column=0, columnspan=3, pady=(8, 0))
@@ -3594,6 +3596,13 @@ class InventurAppSK:
                     entry = next(
                         (d for d in self.not_found_data_zert if d.get("charge") == charge),
                         None)
+            elif self.warehouse_mode == "WIP":
+                sales_order = values[1] if len(values) > 1 else ""
+                order = values[2] if len(values) > 2 else ""
+                entry = next(
+                    (d for d in self.inventur_data_wip
+                     if d.get("sales_order") == sales_order and d.get("order") == order),
+                    None)
             else:  # SK
                 entry = next(
                     (d for d in self.inventur_data if d.get("charge") == charge),
@@ -3674,6 +3683,55 @@ class InventurAppSK:
             fach_entry.focus_set()
             fach_entry.bind("<Return>", lambda e: brte_entry.focus_set())
             brte_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
+            remarks_entry.bind("<Return>", lambda e: save_edit())
+
+        elif self.warehouse_mode == "WIP":
+            ttk.Label(frame, text="Sales Order:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("sales_order", ""), font=("Arial", 16)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Order:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("order", ""), font=("Arial", 16)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text=f"Quantity * ({entry.get('bme', '')}):", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            menge_var = tk.StringVar(value=entry.get("menge", ""))
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 18), width=15)
+            menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Remarks:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            remarks_var = tk.StringVar(value=entry.get("remarks", ""))
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 18), width=40)
+            remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            def save_edit():
+                new_menge = menge_var.get().strip()
+                new_remarks = remarks_var.get().strip()
+                if not new_menge:
+                    messagebox.showerror("Validation", "Quantity is required.", parent=dlg)
+                    return
+                try:
+                    float(new_menge)
+                except ValueError:
+                    messagebox.showerror("Validation", "Quantity must be a number.", parent=dlg)
+                    return
+                entry["menge"] = new_menge
+                entry["remarks"] = new_remarks
+                self.save_wip_excel()
+                self.update_list()
+                self.status_var.set(f"Entry updated: {entry.get('sales_order', '')}/{entry.get('order', '')}")
+                dlg.destroy()
+
+            menge_entry.focus_set()
+            menge_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
         elif self.warehouse_mode == "Zert":
@@ -3804,6 +3862,16 @@ class InventurAppSK:
                 self.update_list()
                 self.status_var.set(f"Entry deleted: {kauf}/{pos}")
                 self.logger.info(f"KMAT entry deleted: {kauf}/{pos}")
+            elif self.warehouse_mode == "WIP":
+                sales_order = values[1] if len(values) > 1 else ""
+                order = values[2] if len(values) > 2 else ""
+                self.inventur_data_wip = [
+                    d for d in self.inventur_data_wip
+                    if not (d.get("sales_order") == sales_order and d.get("order") == order)]
+                self.save_wip_excel()
+                self.update_list()
+                self.status_var.set(f"Entry deleted: {sales_order}/{order}")
+                self.logger.info(f"WIP entry deleted: {sales_order}/{order}")
             else:
                 charge = values[1]
                 if self.warehouse_mode == "Zert":
