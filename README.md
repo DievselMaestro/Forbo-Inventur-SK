@@ -5,7 +5,7 @@
 Desktop application for warehouse inventory at **Forbo**.
 Supports **four warehouse modes**: **HALB**, **ZERT**, **KMAT**, and **WIP**.
 
-- Version: **2.4**
+- Version: **2.5**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 
@@ -517,5 +517,22 @@ If problems persist:
 
 ---
 
+---
+
+## Changelog
+
+### Version 2.5 – May 2026
+- **Bug fix – WIP Edit entry:** "Entry not found in data" error when trying to edit a WIP entry is resolved. The lookup now correctly searches `sales_order` + `order` in the WIP data list instead of falling back to the HALB/SK data.
+- **Bug fix – WIP Delete entry:** Same root cause fixed for delete — WIP entries are now removed from the correct data list.
+- **UI – WIP scan dialog (Order selection popup):** All font sizes doubled (labels, combobox input, dropdown list). Window enlarged from 400×200 to 600×350 px.
+- **UI – WIP info panel:** All label and value font sizes doubled (9→18, 10→20).
+- **UI – WIP input panel:** All label and entry field font sizes doubled (10→20, quantity entry 12→24).
+- **UI – KMAT scan dialog (Position selection popup):** All font sizes doubled (labels, combobox input, dropdown list). Window enlarged from 400×200 to 600×350 px.
+
+### Version 2.4 – May 2026
+- WIP warehouse mode added (Sales Order + Order selection, quantity input).
+
+---
+
 **Developed for Forbo Movement Systems**
-*Version 2.4 – May 2026*
+*Version 2.5 – May 2026*
