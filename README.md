@@ -5,7 +5,7 @@
 Desktop application for warehouse inventory at **Forbo**.
 Supports **four warehouse modes**: **HALB**, **ZERT**, **KMAT**, and **WIP**.
 
-- Version: **2.6**
+- Version: **2.7**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 

@@ -10,7 +10,7 @@ Supports two warehouse modes: SK (Malacky), Zert, HALB and WIP.
 Developed for Windows 11, Python 3.11+
 
 Date: Mai 2026
-Version: 2.6 SK+Zert
+Version: 2.7 SK+Zert
 """
 
 import tkinter as tk
@@ -355,7 +355,7 @@ class NotFoundDialogSK:
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Roll Not Found - Manual Entry")
-        self.dialog.geometry("560x640")
+        self.dialog.geometry("860x820")
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -390,7 +390,7 @@ class NotFoundDialogSK:
         ttk.Label(
             inner,
             text=f"Roll not found in master table!\nBatch No.: {charge}",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 22, "bold"),
             foreground="red",
             justify=tk.CENTER,
         ).pack(pady=(0, 16))
@@ -412,10 +412,10 @@ class NotFoundDialogSK:
         ]
 
         for r, (lbl, val) in enumerate(pre_filled):
-            ttk.Label(info_frame, text=lbl, font=("Arial", 9, "bold")).grid(
-                row=r, column=0, sticky=tk.W, pady=1)
-            ttk.Label(info_frame, text=val, font=("Arial", 9)).grid(
-                row=r, column=1, sticky=tk.W, padx=(8, 0), pady=1)
+            ttk.Label(info_frame, text=lbl, font=("Arial", 16, "bold")).grid(
+                row=r, column=0, sticky=tk.W, pady=3)
+            ttk.Label(info_frame, text=val, font=("Arial", 16)).grid(
+                row=r, column=1, sticky=tk.W, padx=(12, 0), pady=3)
 
         # Manual fields
         manual_frame = ttk.LabelFrame(inner, text="Manual Input", padding="10")
@@ -438,9 +438,9 @@ class NotFoundDialogSK:
         self._entries = {}
         for i, (label, var, _required) in enumerate(fields):
             field_frame = ttk.Frame(manual_frame)
-            field_frame.pack(fill=tk.X, pady=4)
-            ttk.Label(field_frame, text=label, font=("Arial", 9)).pack(anchor=tk.W)
-            entry = ttk.Entry(field_frame, textvariable=var, width=50, font=("Arial", 10))
+            field_frame.pack(fill=tk.X, pady=6)
+            ttk.Label(field_frame, text=label, font=("Arial", 18)).pack(anchor=tk.W)
+            entry = ttk.Entry(field_frame, textvariable=var, width=50, font=("Arial", 20))
             entry.pack(fill=tk.X)
             self._entries[label] = entry
             if i == 0:
@@ -448,10 +448,10 @@ class NotFoundDialogSK:
 
         # Buttons
         btn_frame = ttk.Frame(inner)
-        btn_frame.pack(pady=(16, 4))
-        ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(
-            side=tk.LEFT, padx=(0, 12))
-        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(
+        btn_frame.pack(pady=(16, 8))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=14).pack(
+            side=tk.LEFT, padx=(0, 16))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=14).pack(
             side=tk.LEFT)
 
         self.dialog.bind("<Escape>", lambda e: self._cancel())
@@ -512,8 +512,8 @@ class NotFoundDialogZert:
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Charge Not Found - Manual Entry")
-        self.dialog.geometry("480x320")
-        self.dialog.resizable(False, False)
+        self.dialog.geometry("720x520")
+        self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         self.dialog.geometry(
@@ -530,39 +530,39 @@ class NotFoundDialogZert:
         ttk.Label(
             frame,
             text=f"Charge not found!\nCharge: {self._charge}",
-            font=("Arial", 12, "bold"),
+            font=("Arial", 20, "bold"),
             foreground="red",
             justify=tk.CENTER,
         ).pack(pady=(0, 16))
 
         info_frame = ttk.LabelFrame(frame, text="QR Data (read-only)", padding="8")
         info_frame.pack(fill=tk.X, pady=(0, 12))
-        ttk.Label(info_frame, text="Charge:", font=("Arial", 9, "bold")).grid(row=0, column=0, sticky=tk.W)
-        ttk.Label(info_frame, text=self._charge, font=("Arial", 9)).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
+        ttk.Label(info_frame, text="Charge:", font=("Arial", 16, "bold")).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(info_frame, text=self._charge, font=("Arial", 16)).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
 
         manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
-        manual_frame.pack(fill=tk.X, pady=(0, 12))
+        manual_frame.pack(fill=tk.X, pady=(0, 16))
 
         self.material_var = tk.StringVar()
         self.menge_var = tk.StringVar()
         self.remarks_var = tk.StringVar()
 
-        ttk.Label(manual_frame, text="Material No. *:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=4)
-        mat_entry = ttk.Entry(manual_frame, textvariable=self.material_var, width=30, font=("Arial", 10))
-        mat_entry.grid(row=0, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        ttk.Label(manual_frame, text="Material No. *:", font=("Arial", 18)).grid(row=0, column=0, sticky=tk.W, pady=6)
+        mat_entry = ttk.Entry(manual_frame, textvariable=self.material_var, width=28, font=("Arial", 20))
+        mat_entry.grid(row=0, column=1, sticky=tk.W, padx=(12, 0), pady=6)
         mat_entry.focus_set()
 
-        ttk.Label(manual_frame, text="Recorded Quantity *:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=4)
-        menge_entry = ttk.Entry(manual_frame, textvariable=self.menge_var, width=15, font=("Arial", 10))
-        menge_entry.grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        ttk.Label(manual_frame, text="Recorded Quantity *:", font=("Arial", 18)).grid(row=1, column=0, sticky=tk.W, pady=6)
+        menge_entry = ttk.Entry(manual_frame, textvariable=self.menge_var, width=14, font=("Arial", 20))
+        menge_entry.grid(row=1, column=1, sticky=tk.W, padx=(12, 0), pady=6)
 
-        ttk.Label(manual_frame, text="Remarks:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(manual_frame, textvariable=self.remarks_var, width=30, font=("Arial", 10)).grid(row=2, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        ttk.Label(manual_frame, text="Remarks:", font=("Arial", 18)).grid(row=2, column=0, sticky=tk.W, pady=6)
+        ttk.Entry(manual_frame, textvariable=self.remarks_var, width=28, font=("Arial", 20)).grid(row=2, column=1, sticky=tk.W, padx=(12, 0), pady=6)
 
         btn_frame = ttk.Frame(frame)
-        btn_frame.pack(pady=(8, 0))
-        ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(side=tk.LEFT)
+        btn_frame.pack(pady=(12, 0))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=14).pack(side=tk.LEFT, padx=(0, 16))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=14).pack(side=tk.LEFT)
 
         self.dialog.bind("<Escape>", lambda e: self._cancel())
 
@@ -1476,13 +1476,13 @@ class InventurAppSK:
         style.configure("BigScan.TButton", font=("Arial", 20))
         style.configure("BigSave.TButton", font=("Arial", 20))
         if self.warehouse_mode == "Zert":
-            self.root.title("INVENTORY Forbo - Zert Warehouse")
+            self.root.title("INVENTORY Forbo - ZERT Warehouse")
         elif self.warehouse_mode == "KMAT":
             self.root.title("INVENTORY Forbo - KMAT Warehouse")
         elif self.warehouse_mode == "WIP":
             self.root.title("INVENTORY Forbo - WIP Warehouse")
         else:
-            self.root.title("INVENTORY Forbo SK - Malacky Warehouse Management")
+            self.root.title("INVENTORY Forbo - HALB Warehouse")
         self.root.geometry("1280x820")
         self.root.configure(bg="#f0f0f0")
 
@@ -1519,7 +1519,7 @@ class InventurAppSK:
 
         if self.warehouse_mode == "Zert":
             fg_color = "#375623"
-            header_text = "INVENTORY Forbo - Zert Warehouse"
+            header_text = "INVENTORY Forbo - ZERT Warehouse"
         elif self.warehouse_mode == "KMAT":
             fg_color = "#6b1f1f"
             header_text = "INVENTORY Forbo - KMAT Warehouse"
@@ -1528,7 +1528,7 @@ class InventurAppSK:
             header_text = "INVENTORY Forbo - WIP Warehouse"
         else:
             fg_color = "#1f4e79"
-            header_text = "INVENTORY Forbo SK - Malacky Warehouse Management"
+            header_text = "INVENTORY Forbo - HALB Warehouse"
 
         ttk.Label(header_frame, text="[F]", font=("Arial", 20, "bold"),
                   foreground=fg_color).grid(row=0, column=0, padx=(0, 16))
@@ -2802,6 +2802,21 @@ class InventurAppSK:
     # List update
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _parse_ts(ts_str):
+        """Parse a timestamp string to datetime for correct sort order.
+
+        Handles the in-session format DD.MM.YYYY HH:MM:SS and the ISO format
+        that pandas produces when reading Excel date cells (YYYY-MM-DD HH:MM:SS).
+        Falls back to datetime.min so unparseable values sort last.
+        """
+        for fmt in ("%d.%m.%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(ts_str, fmt)
+            except ValueError:
+                continue
+        return datetime.min
+
     def update_list(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
@@ -2813,7 +2828,7 @@ class InventurAppSK:
             for d in self.not_found_data_zert:
                 all_items.append((d, "Not Found"))
 
-            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+            all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
 
             for d, status in all_items:
                 ts = d.get("zeitstempel", "")
@@ -2843,7 +2858,7 @@ class InventurAppSK:
             for d in self.not_found_data_kmat:
                 all_items.append((d, "Not Found"))
 
-            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+            all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
 
             for d, status in all_items:
                 ts = d.get("zeitstempel", "")
@@ -2869,7 +2884,7 @@ class InventurAppSK:
             )
         elif self.warehouse_mode == "WIP":
             all_items = [(d, "Found") for d in self.inventur_data_wip]
-            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+            all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
 
             for d, status in all_items:
                 ts = d.get("zeitstempel", "")
@@ -2895,7 +2910,7 @@ class InventurAppSK:
             for d in self.not_found_data:
                 all_items.append((d, "Not Found"))
 
-            all_items.sort(key=lambda x: x[0].get("zeitstempel", ""), reverse=True)
+            all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
 
             for d, status in all_items:
                 ts = d.get("zeitstempel", "")
