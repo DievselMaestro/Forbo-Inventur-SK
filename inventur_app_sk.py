@@ -6,11 +6,11 @@ INVENTORY PROGRAM FOR FORBO SK - MALACKY WAREHOUSE MANAGEMENT
 
 Desktop application for warehouse inventory with barcode scanner integration.
 Supports Rolls only (no granulate).
-Supports two warehouse modes: SK (Malacky) and Zert.
+Supports two warehouse modes: SK (Malacky), Zert, HALB and WIP.
 Developed for Windows 11, Python 3.11+
 
 Date: Mai 2026
-Version: 2.5 SK+Zert
+Version: 2.6 SK+Zert
 """
 
 import tkinter as tk
@@ -38,7 +38,7 @@ class WarehouseSelectionDialog:
         self.result = None
 
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Lager auswählen / Select Warehouse")
+        self.dialog.title("Select Warehouse")
         self.dialog.geometry("640x310")
         self.dialog.resizable(False, False)
         self.dialog.grab_set()
@@ -58,7 +58,7 @@ class WarehouseSelectionDialog:
 
         ttk.Label(
             frame,
-            text="Welches Lager scannen?\nWhich warehouse to scan?",
+            text="Which warehouse to scan?",
             font=("Arial", 13, "bold"),
             justify=tk.CENTER,
         ).pack(pady=(0, 20))
@@ -248,9 +248,18 @@ class SettingsDialog:
 
         frame.columnconfigure(0, weight=1)
 
+        # --- Switch Warehouse button toggle ---
+        self.switch_warehouse_var = tk.BooleanVar(
+            value=self.config.get("show_switch_warehouse", False))
+        ttk.Checkbutton(
+            frame,
+            text="Show 'Switch Warehouse' button (for presentations)",
+            variable=self.switch_warehouse_var,
+        ).grid(row=16, column=0, columnspan=2, sticky=tk.W, pady=(20, 0))
+
         # --- Buttons ---
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=16, column=0, columnspan=2, pady=(24, 0))
+        btn_frame.grid(row=17, column=0, columnspan=2, pady=(16, 0))
 
         ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(
             side=tk.LEFT, padx=(0, 12))
@@ -321,6 +330,7 @@ class SettingsDialog:
         self.config["export_kmat_path"] = self.kmat_export_path_var.get().strip()
         self.config["arbeitstabelle_wip_path"] = self.wip_master_path_var.get().strip()
         self.config["export_wip_path"] = self.wip_export_path_var.get().strip()
+        self.config["show_switch_warehouse"] = self.switch_warehouse_var.get()
         self.result = self.config
         self.dialog.destroy()
 
@@ -616,7 +626,7 @@ class PositionInputDialog:
         frame = ttk.Frame(self.dialog, padding="20")
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text=f"Kauf-Nr.: {self._kauf}",
+        ttk.Label(frame, text=f"Purchase No.: {self._kauf}",
                   font=("Arial", 24, "bold")).pack(pady=(0, 12))
 
         ttk.Label(frame, text="Select Position:", font=("Arial", 20)).pack(anchor=tk.W)
@@ -745,7 +755,7 @@ class NotFoundDialogKMAT:
 
         ttk.Label(
             frame,
-            text=f"Kauf+POS not found!\nKauf-Nr.: {self._kauf}  |  POS: {self._pos}",
+            text=f"Purchase No. + POS not found!\nPurchase No.: {self._kauf}  |  POS: {self._pos}",
             font=("Arial", 12, "bold"),
             foreground="red",
             justify=tk.CENTER,
@@ -952,6 +962,7 @@ class InventurAppSK:
             "export_kmat_path": "",
             "arbeitstabelle_wip_path": "",
             "export_wip_path": "",
+            "show_switch_warehouse": False,
         }
         try:
             if config_path.exists():
@@ -1427,6 +1438,7 @@ class InventurAppSK:
             self.config.update(dlg.result)
             self.save_config()
             self._resolve_paths()
+            self._apply_switch_button_visibility()
             # Re-enable scan if it was disabled
             self.scan_entry.config(state="normal")
             if self.warehouse_mode == "Zert":
@@ -1441,6 +1453,18 @@ class InventurAppSK:
             else:
                 self.load_arbeitstabelle()
                 messagebox.showinfo("Settings Saved", "Settings have been saved.\nMaster table reloaded.")
+
+    def _apply_switch_button_visibility(self):
+        if self.config.get("show_switch_warehouse", False):
+            self.switch_btn.grid()
+        else:
+            self.switch_btn.grid_remove()
+
+    def switch_warehouse(self):
+        """Restart the app so the warehouse selection dialog appears again."""
+        if messagebox.askyesno("Switch Warehouse", "Switch to a different warehouse?\nUnsaved data will be lost."):
+            self.root.destroy()
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -1815,7 +1839,7 @@ class InventurAppSK:
         self.kmat_info_container.columnconfigure(3, weight=1)
 
         fields_left = [
-            ("Kauf-Nr.:", "kmat_lbl_kauf"),
+            ("Purchase No.:", "kmat_lbl_kauf"),
             ("POS:", "kmat_lbl_pos"),
             ("Material No.:", "kmat_lbl_material"),
             ("Description:", "kmat_lbl_kurztext"),
@@ -1932,7 +1956,7 @@ class InventurAppSK:
         menge_e.grid(row=0, column=1, sticky=tk.W, padx=(8, 8), pady=4)
         self.wip_input_widgets["menge_entry"] = menge_e
 
-        ttk.Label(wip_input, text="Stk", font=("Arial", 20)).grid(row=0, column=2, sticky=tk.W, pady=4)
+        ttk.Label(wip_input, text="pcs", font=("Arial", 20)).grid(row=0, column=2, sticky=tk.W, pady=4)
 
         ttk.Label(wip_input, text="Remarks:", font=("Arial", 20)).grid(row=1, column=0, sticky=tk.W, pady=4)
         ttk.Entry(wip_input, textvariable=self.wip_remarks_var, width=30, font=("Arial", 20)).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=(8, 0), pady=4)
@@ -2016,7 +2040,7 @@ class InventurAppSK:
         if self.warehouse_mode == "Zert":
             columns = ("Time", "Charge", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "KMAT":
-            columns = ("Time", "Kauf-Nr.", "POS", "Material No.", "Description", "Quantity", "UOM", "Status")
+            columns = ("Time", "Purchase No.", "POS", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "WIP":
             columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM")
         else:
@@ -2037,7 +2061,7 @@ class InventurAppSK:
             self.tree.column("Status", width=100, minwidth=80)
         elif self.warehouse_mode == "KMAT":
             self.tree.column("Time", width=80, minwidth=70)
-            self.tree.column("Kauf-Nr.", width=110, minwidth=80)
+            self.tree.column("Purchase No.", width=110, minwidth=80)
             self.tree.column("POS", width=50, minwidth=40)
             self.tree.column("Material No.", width=100, minwidth=80)
             self.tree.column("Description", width=200, minwidth=120)
@@ -2084,7 +2108,13 @@ class InventurAppSK:
         ttk.Button(btn_frame, text="Fullscreen (F11)", command=self.toggle_fullscreen).grid(
             row=0, column=2, padx=(0, 10))
         ttk.Button(btn_frame, text="Quit", command=self.quit_app).grid(
-            row=0, column=3)
+            row=0, column=3, padx=(0, 10))
+
+        self.switch_btn = ttk.Button(
+            btn_frame, text="Switch Warehouse", command=self.switch_warehouse)
+        self.switch_btn.grid(row=0, column=4)
+        if not self.config.get("show_switch_warehouse", False):
+            self.switch_btn.grid_remove()
 
     # --- Status bar ---
 
@@ -2148,8 +2178,8 @@ class InventurAppSK:
             positions = self.get_kmat_positions(kauf)
             if not positions:
                 messagebox.showerror(
-                    "Kundenauftrag Not Found",
-                    f"Kundenauftrag '{kauf}' was not found in the master table.",
+                    "Purchase Order Not Found",
+                    f"Purchase Order '{kauf}' was not found in the master table.",
                 )
                 self._reset_scan()
                 return
@@ -2171,7 +2201,7 @@ class InventurAppSK:
             if already:
                 messagebox.showwarning(
                     "Already Scanned",
-                    f"Kauf-Nr. '{kauf}' / POS '{pos}' has already been scanned!",
+                    f"Purchase No. '{kauf}' / POS '{pos}' has already been scanned!",
                 )
                 self._reset_scan()
                 return
@@ -2182,7 +2212,7 @@ class InventurAppSK:
             else:
                 messagebox.showerror(
                     "Position Not Found",
-                    f"Position '{pos}' for Kundenauftrag '{kauf}' was not found.",
+                    f"Position '{pos}' for Purchase Order '{kauf}' was not found.",
                 )
                 self._reset_scan()
         elif self.warehouse_mode == "WIP":
@@ -2190,8 +2220,8 @@ class InventurAppSK:
             orders = self.get_wip_orders(sales_order)
             if not orders:
                 messagebox.showerror(
-                    "Sales Order nicht gefunden / alle erfasst",
-                    f"Sales Order '{sales_order}' wurde nicht gefunden oder alle Orders wurden bereits erfasst.",
+                    "Sales Order Not Found",
+                    f"Sales Order '{sales_order}' was not found or all orders have already been recorded.",
                 )
                 self._reset_scan()
                 return
@@ -2205,8 +2235,8 @@ class InventurAppSK:
                 self.show_found_wip(row_data, sales_order, order)
             else:
                 messagebox.showerror(
-                    "Order nicht gefunden",
-                    f"Order '{order}' für Sales Order '{sales_order}' wurde nicht gefunden.",
+                    "Order Not Found",
+                    f"Order '{order}' for Sales Order '{sales_order}' was not found.",
                 )
                 self._reset_scan()
         else:
@@ -3064,7 +3094,7 @@ class InventurAppSK:
         "Location",
         "Material No.",
         "Description",
-        "Kauf-Nr.",
+        "Purchase No.",
         "POS",
         "UOM",
         "Free Usable",
@@ -3322,7 +3352,7 @@ class InventurAppSK:
         loaded = 0
         try:
             df_inv = pd.read_excel(
-                self.inventur_kmat_path, sheet_name="Inventory", dtype={"Kauf-Nr.": str, "POS": str})
+                self.inventur_kmat_path, sheet_name="Inventory", dtype={"Purchase No.": str, "POS": str})
             for _, row in df_inv.iterrows():
                 self.inventur_data_kmat.append(self._row_to_kmat_dict(row, status="found"))
                 loaded += 1
@@ -3331,7 +3361,7 @@ class InventurAppSK:
 
         try:
             df_nf = pd.read_excel(
-                self.inventur_kmat_path, sheet_name="Not_Found", dtype={"Kauf-Nr.": str, "POS": str})
+                self.inventur_kmat_path, sheet_name="Not_Found", dtype={"Purchase No.": str, "POS": str})
             for _, row in df_nf.iterrows():
                 self.not_found_data_kmat.append(self._row_to_kmat_dict(row, status="not_found"))
                 loaded += 1
@@ -3362,7 +3392,7 @@ class InventurAppSK:
             "lort": _str(row.get("Location", "")),
             "material": _str(row.get("Material No.", "")),
             "kurztext": _str(row.get("Description", "")),
-            "kauf": _str(row.get("Kauf-Nr.", "")),
+            "kauf": _str(row.get("Purchase No.", "")),
             "pos": _str(row.get("POS", "")),
             "bme": _str(row.get("UOM", "")),
             "frei_verw": _str(row.get("Free Usable", "")),
@@ -3778,7 +3808,7 @@ class InventurAppSK:
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
         else:  # KMAT
-            ttk.Label(frame, text="Kauf-Nr.:", font=("Arial", 16, "bold")).grid(
+            ttk.Label(frame, text="Purchase No.:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             ttk.Label(frame, text=entry.get("kauf", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
@@ -3849,7 +3879,7 @@ class InventurAppSK:
         values = self.tree.item(item_id, "values")
         if len(values) >= 2:
             if self.warehouse_mode == "KMAT":
-                # For KMAT: values = (Time, Kauf-Nr., POS, ...)
+                # For KMAT: values = (Time, Purchase No., POS, ...)
                 kauf = values[1] if len(values) > 1 else ""
                 pos = values[2] if len(values) > 2 else ""
                 self.inventur_data_kmat = [

@@ -5,7 +5,7 @@
 Desktop application for warehouse inventory at **Forbo**.
 Supports **four warehouse modes**: **HALB**, **ZERT**, **KMAT**, and **WIP**.
 
-- Version: **2.5**
+- Version: **2.6**
 - Platform: Windows 11, Python 3.11+
 - Main script: `inventur_app_sk.py`
 
@@ -244,6 +244,16 @@ Editable fields per mode:
 The batch number / charge / order number is shown for reference but cannot be changed.
 The Excel file is updated automatically after saving.
 
+### Toolbar Buttons
+
+| Button | Action |
+|--------|--------|
+| **Export / Backup** | Create a timestamped backup of the current inventory file |
+| **Settings** | Open the settings dialog (file paths, display options) |
+| **Fullscreen (F11)** | Toggle fullscreen mode |
+| **Quit** | Exit the application |
+| **Switch Warehouse** | Return to the warehouse selection dialog (hidden by default — enable in Settings) |
+
 ### Keyboard Shortcuts
 
 | Key | Action |
@@ -435,7 +445,8 @@ Settings file: `config/settings_sk.json`
   "export_kmat_path": "C:/path/to/kmat/output/folder",
   "arbeitstabelle_wip_path": "C:/path/to/wip_master_table.xlsx",
   "export_wip_path": "C:/path/to/wip/output/folder",
-  "vollbild": true
+  "vollbild": true,
+  "show_switch_warehouse": false
 }
 ```
 
@@ -451,6 +462,7 @@ Settings file: `config/settings_sk.json`
 | `arbeitstabelle_wip_path` | Full path to the WIP master table Excel file |
 | `export_wip_path` | Folder for WIP inventory file and backups |
 | `vollbild` | Start maximised (`true` recommended) |
+| `show_switch_warehouse` | Show the **Switch Warehouse** button in the toolbar (default: `false`) |
 
 ---
 
@@ -502,7 +514,7 @@ All activity is logged to `config/inventory_sk.log`:
 
 ### WIP: Sales Order not found / no orders shown
 - Verify that the Sales Order number exists in the WIP master table
-- If all Orders under that Sales Order have already been recorded, the error "alle Orders wurden bereits erfasst" is shown — this is correct behaviour
+- If all Orders under that Sales Order have already been recorded, the message "Sales Order not found or all orders have already been recorded" is shown — this is correct behaviour
 - Make sure the correct WIP master table file is configured in Settings
 - The program reads the **first sheet** of the Excel file regardless of its name
 
@@ -521,6 +533,12 @@ If problems persist:
 
 ## Changelog
 
+### Version 2.6 – June 2026
+- **UI – Full English translation:** All remaining German text in dialogs, error messages, and labels has been replaced with English. The startup warehouse selection dialog no longer shows bilingual text.
+- **UI – "Kauf-Nr." renamed to "Purchase No.":** All visible labels, column headers, and error messages now use "Purchase No." consistently (internal variable names and Excel column headers updated accordingly).
+- **UI – WIP unit label:** "Stk" (Stück) changed to "pcs" in the WIP input panel.
+- **Feature – Switch Warehouse button:** A new **Switch Warehouse** button can be shown in the toolbar via **Settings → Show 'Switch Warehouse' button**. It is hidden by default and intended for presentations. Clicking it asks for confirmation and restarts the application, showing the warehouse selection dialog again.
+
 ### Version 2.5 – May 2026
 - **Bug fix – WIP Edit entry:** "Entry not found in data" error when trying to edit a WIP entry is resolved. The lookup now correctly searches `sales_order` + `order` in the WIP data list instead of falling back to the HALB/SK data.
 - **Bug fix – WIP Delete entry:** Same root cause fixed for delete — WIP entries are now removed from the correct data list.
@@ -535,4 +553,4 @@ If problems persist:
 ---
 
 **Developed for Forbo Movement Systems**
-*Version 2.5 – May 2026*
+*Version 2.6 – June 2026*
