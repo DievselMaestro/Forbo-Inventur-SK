@@ -9,8 +9,8 @@ Supports Rolls only (no granulate).
 Supports two warehouse modes: SK (Malacky), Zert, HALB and WIP.
 Developed for Windows 11, Python 3.11+
 
-Date: Mai 2026
-Version: 2.7 SK+Zert
+Date: Juni 2026
+Version: 2.8 SK+Zert
 """
 
 import tkinter as tk
@@ -1058,6 +1058,20 @@ class InventurAppSK:
                 "lnge2": 0,
                 "brte2": 0,
             }
+
+    def _extract_wip_sales_order(self, raw):
+        """Extract the 8-digit sales order number from a WIP scan.
+
+        Plant 1723 (Malacky) production order sheets carry a QR code that
+        starts with '00' followed by the 8-digit sales order number
+        (e.g. '0017119322...'). Plant 1701 barcodes contain the 8-digit
+        number directly. Anything that doesn't match the QR pattern is
+        returned unchanged.
+        """
+        value = raw.strip()
+        if len(value) > 10 and value.startswith("00") and value[2:10].isdigit():
+            return value[2:10]
+        return value
 
     # ------------------------------------------------------------------
     # Master table (SK)
@@ -2216,7 +2230,11 @@ class InventurAppSK:
                 )
                 self._reset_scan()
         elif self.warehouse_mode == "WIP":
-            sales_order = raw.strip()
+            sales_order = self._extract_wip_sales_order(raw)
+            if sales_order != raw.strip():
+                self.logger.info(
+                    f"WIP QR code detected: extracted sales order '{sales_order}'"
+                )
             orders = self.get_wip_orders(sales_order)
             if not orders:
                 messagebox.showerror(
