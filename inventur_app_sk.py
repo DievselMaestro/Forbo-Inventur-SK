@@ -28,6 +28,34 @@ import logging
 
 
 # ---------------------------------------------------------------------------
+# Shared scan-resolution helpers (WIP / KMAT)
+# ---------------------------------------------------------------------------
+
+def _norm_num(x):
+    """Normalize a numeric-ish value to a bare digit string, no leading zeros."""
+    if x is None:
+        return ""
+    s = str(x).strip()
+    if s in ("", "nan"):
+        return ""
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        return ""
+
+
+def _norm_num_lookup(x):
+    """Like _norm_num, but keeps the stripped original on failure instead of
+    "" so a malformed query value still fails to match rather than matching
+    blank cells."""
+    s = str(x).strip() if x is not None else ""
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        return s
+
+
+# ---------------------------------------------------------------------------
 # Warehouse Selection Dialog
 # ---------------------------------------------------------------------------
 
@@ -599,141 +627,13 @@ class NotFoundDialogZert:
 
 
 # ---------------------------------------------------------------------------
-# PositionInputDialog
-# ---------------------------------------------------------------------------
-
-class PositionInputDialog:
-    """Dialog to select Position for a scanned Kaufnummer."""
-
-    def __init__(self, parent, kauf, positions):
-        self.result = None
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Select Position")
-        self.dialog.geometry("600x350")
-        self.dialog.resizable(False, False)
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
-        self.dialog.geometry(
-            "+%d+%d" % (parent.winfo_rootx() + 80, parent.winfo_rooty() + 80)
-        )
-        self._kauf = kauf
-        self._positions = positions
-        self.dialog.option_add('*TCombobox*Listbox.font', ('Arial', 24))
-        self._build_widgets()
-        self.dialog.wait_window()
-
-    def _build_widgets(self):
-        frame = ttk.Frame(self.dialog, padding="20")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text=f"Purchase No.: {self._kauf}",
-                  font=("Arial", 24, "bold")).pack(pady=(0, 12))
-
-        ttk.Label(frame, text="Select Position:", font=("Arial", 20)).pack(anchor=tk.W)
-
-        self.pos_var = tk.StringVar()
-        if self._positions:
-            self.pos_var.set(self._positions[0])
-
-        combo = ttk.Combobox(frame, textvariable=self.pos_var,
-                             values=self._positions, font=("Arial", 24), width=15,
-                             state="readonly" if self._positions else "normal")
-        combo.pack(pady=(4, 16), anchor=tk.W)
-        combo.focus_set()
-
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
-        ttk.Button(btn_frame, text="OK", command=self._ok, width=10).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=10).pack(side=tk.LEFT)
-
-        self.dialog.bind("<Return>", lambda e: self._ok())
-        self.dialog.bind("<Escape>", lambda e: self._cancel())
-
-    def _ok(self):
-        pos = self.pos_var.get().strip()
-        if not pos:
-            messagebox.showerror("Error", "Please select or enter a position.", parent=self.dialog)
-            return
-        self.result = pos
-        self.dialog.destroy()
-
-    def _cancel(self):
-        self.result = None
-        self.dialog.destroy()
-
-
-# ---------------------------------------------------------------------------
-# WIPOrderDialog
-# ---------------------------------------------------------------------------
-
-class WIPOrderDialog:
-    """Dialog to select Order for a scanned Sales Order."""
-
-    def __init__(self, parent, sales_order, orders):
-        self.result = None
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Select Order")
-        self.dialog.geometry("600x350")
-        self.dialog.resizable(False, False)
-        self.dialog.transient(parent)
-        self.dialog.grab_set()
-        self.dialog.geometry(
-            "+%d+%d" % (parent.winfo_rootx() + 80, parent.winfo_rooty() + 80)
-        )
-        self._sales_order = sales_order
-        self._orders = orders
-        self.dialog.option_add('*TCombobox*Listbox.font', ('Arial', 24))
-        self._build_widgets()
-        self.dialog.wait_window()
-
-    def _build_widgets(self):
-        frame = ttk.Frame(self.dialog, padding="20")
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text=f"Sales Order: {self._sales_order}",
-                  font=("Arial", 24, "bold")).pack(pady=(0, 12))
-
-        ttk.Label(frame, text="Select Order:", font=("Arial", 20)).pack(anchor=tk.W)
-
-        self.order_var = tk.StringVar()
-        if self._orders:
-            self.order_var.set(self._orders[0])
-
-        combo = ttk.Combobox(frame, textvariable=self.order_var,
-                             values=self._orders, font=("Arial", 24), width=15,
-                             state="readonly" if self._orders else "normal")
-        combo.pack(pady=(4, 16), anchor=tk.W)
-        combo.focus_set()
-
-        btn_frame = ttk.Frame(frame)
-        btn_frame.pack()
-        ttk.Button(btn_frame, text="OK", command=self._ok, width=10).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=10).pack(side=tk.LEFT)
-
-        self.dialog.bind("<Return>", lambda e: self._ok())
-        self.dialog.bind("<Escape>", lambda e: self._cancel())
-
-    def _ok(self):
-        order = self.order_var.get().strip()
-        if not order:
-            messagebox.showerror("Error", "Please select an order.", parent=self.dialog)
-            return
-        self.result = order
-        self.dialog.destroy()
-
-    def _cancel(self):
-        self.result = None
-        self.dialog.destroy()
-
-
-# ---------------------------------------------------------------------------
 # NotFoundDialogKMAT
 # ---------------------------------------------------------------------------
 
 class NotFoundDialogKMAT:
-    """Dialog for KMAT: Kauf+POS not found in master table."""
+    """Dialog for KMAT: scanned Order not found in master table."""
 
-    def __init__(self, parent, kauf, pos):
+    def __init__(self, parent, order):
         self.result = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Not Found - Manual Entry")
@@ -744,8 +644,7 @@ class NotFoundDialogKMAT:
         self.dialog.geometry(
             "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
         )
-        self._kauf = kauf
-        self._pos = pos
+        self._order = order
         self._build_widgets()
         self.dialog.wait_window()
 
@@ -755,7 +654,7 @@ class NotFoundDialogKMAT:
 
         ttk.Label(
             frame,
-            text=f"Purchase No. + POS not found!\nPurchase No.: {self._kauf}  |  POS: {self._pos}",
+            text=f"Order not found!\nOrder: {self._order}",
             font=("Arial", 12, "bold"),
             foreground="red",
             justify=tk.CENTER,
@@ -796,18 +695,105 @@ class NotFoundDialogKMAT:
             messagebox.showerror("Error", "Recorded Quantity is required.", parent=self.dialog)
             return
         self.result = {
-            "kauf": self._kauf,
-            "pos": self._pos,
+            "order": self._order,
+            "sales_order": "",
             "material": material,
             "kurztext": "",
             "werk": "",
-            "lort": "",
             "bme": "",
-            "frei_verw": "",
             "menge": menge,
             "remarks": self.remarks_var.get().strip(),
             "status": "not_found",
             "_mode": "kmat",
+        }
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
+# NotFoundDialogWIP
+# ---------------------------------------------------------------------------
+
+class NotFoundDialogWIP:
+    """Dialog for WIP: scanned Order not found in master table."""
+
+    def __init__(self, parent, order):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Not Found - Manual Entry")
+        self.dialog.geometry("480x300")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
+        )
+        self._order = order
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text=f"Order not found!\nOrder: {self._order}",
+            font=("Arial", 12, "bold"),
+            foreground="red",
+            justify=tk.CENTER,
+        ).pack(pady=(0, 16))
+
+        manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
+        manual_frame.pack(fill=tk.X, pady=(0, 12))
+
+        self.material_var = tk.StringVar()
+        self.menge_var = tk.StringVar()
+        self.remarks_var = tk.StringVar()
+
+        ttk.Label(manual_frame, text="Material No. *:", font=("Arial", 9)).grid(row=0, column=0, sticky=tk.W, pady=4)
+        mat_entry = ttk.Entry(manual_frame, textvariable=self.material_var, width=30, font=("Arial", 10))
+        mat_entry.grid(row=0, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+        mat_entry.focus_set()
+
+        ttk.Label(manual_frame, text="Recorded Quantity *:", font=("Arial", 9)).grid(row=1, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(manual_frame, textvariable=self.menge_var, width=15, font=("Arial", 10)).grid(row=1, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        ttk.Label(manual_frame, text="Remarks:", font=("Arial", 9)).grid(row=2, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(manual_frame, textvariable=self.remarks_var, width=30, font=("Arial", 10)).grid(row=2, column=1, sticky=tk.W, padx=(8, 0), pady=4)
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=(8, 0))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _save(self):
+        material = self.material_var.get().strip()
+        menge = self.menge_var.get().strip()
+        if not material:
+            messagebox.showerror("Error", "Material No. is required.", parent=self.dialog)
+            return
+        if not menge:
+            messagebox.showerror("Error", "Recorded Quantity is required.", parent=self.dialog)
+            return
+        self.result = {
+            "order": self._order,
+            "sales_order": "",
+            "material": material,
+            "kurztext": "",
+            "werk": "",
+            "bme": "",
+            "order_qty": "",
+            "basic_finish": "",
+            "menge": menge,
+            "remarks": self.remarks_var.get().strip(),
+            "status": "not_found",
+            "_mode": "wip",
         }
         self.dialog.destroy()
 
@@ -1012,6 +998,7 @@ class InventurAppSK:
 
         # WIP data
         self.inventur_data_wip = []
+        self.not_found_data_wip = []
         self.df_wip = None
 
     # ------------------------------------------------------------------
@@ -1058,20 +1045,6 @@ class InventurAppSK:
                 "lnge2": 0,
                 "brte2": 0,
             }
-
-    def _extract_wip_sales_order(self, raw):
-        """Extract the 8-digit sales order number from a WIP scan.
-
-        Plant 1723 (Malacky) production order sheets carry a QR code that
-        starts with '00' followed by the 8-digit sales order number
-        (e.g. '0017119322...'). Plant 1701 barcodes contain the 8-digit
-        number directly. Anything that doesn't match the QR pattern is
-        returned unchanged.
-        """
-        value = raw.strip()
-        if len(value) > 10 and value.startswith("00") and value[2:10].isdigit():
-            return value[2:10]
-        return value
 
     # ------------------------------------------------------------------
     # Master table (SK)
@@ -1139,21 +1112,15 @@ class InventurAppSK:
         try:
             self.df_kmat = pd.read_excel(self.arbeitstabelle_kmat_path, dtype=str)
 
-            def _norm_num(x):
-                if x is None:
-                    return ""
-                s = str(x).strip()
-                if s in ("", "nan"):
-                    return ""
-                try:
-                    return str(int(float(s)))
-                except (ValueError, TypeError):
-                    return ""
+            required = {"Sales Order", "Order", "Material Number"}
+            missing = required - set(self.df_kmat.columns)
+            if missing:
+                raise ValueError(
+                    f"KMAT master table is missing required column(s): {', '.join(sorted(missing))}. "
+                )
 
-            if "Special stock number" in self.df_kmat.columns:
-                self.df_kmat["Special stock number"] = self.df_kmat["Special stock number"].apply(_norm_num)
-            if "POS" in self.df_kmat.columns:
-                self.df_kmat["POS"] = self.df_kmat["POS"].apply(_norm_num)
+            self.df_kmat["Sales Order"] = self.df_kmat["Sales Order"].apply(_norm_num)
+            self.df_kmat["Order"] = self.df_kmat["Order"].apply(_norm_num)
 
             count = len(self.df_kmat)
             self.logger.info(f"KMAT master table loaded: {count} rows")
@@ -1179,17 +1146,6 @@ class InventurAppSK:
                 sheet_name=0,
                 dtype=str,
             )
-
-            def _norm_num(x):
-                if x is None:
-                    return ""
-                s = str(x).strip()
-                if s in ("", "nan"):
-                    return ""
-                try:
-                    return str(int(float(s)))
-                except (ValueError, TypeError):
-                    return ""
 
             if "Sales Order" in self.df_wip.columns:
                 self.df_wip["Sales Order"] = self.df_wip["Sales Order"].apply(_norm_num)
@@ -1234,67 +1190,22 @@ class InventurAppSK:
     # Kauf+POS lookup (KMAT)
     # ------------------------------------------------------------------
 
-    def suche_kmat(self, kauf, pos):
-        """Look up by Kauf + POS in df_kmat. Returns row dict or None."""
+    def suche_kmat(self, order):
+        """Look up by Order in df_kmat. Returns row dict or None."""
         if self.df_kmat is None:
             return None
-        # Normalize input
-        try:
-            kauf_norm = str(int(float(str(kauf).strip())))
-        except (ValueError, TypeError):
-            kauf_norm = str(kauf).strip()
-        try:
-            pos_norm = str(int(float(str(pos).strip())))
-        except (ValueError, TypeError):
-            pos_norm = str(pos).strip()
-        matches = self.df_kmat[
-            (self.df_kmat["Special stock number"] == kauf_norm) &
-            (self.df_kmat["POS"] == pos_norm)
-        ]
+        order_norm = _norm_num_lookup(order)
+        matches = self.df_kmat[self.df_kmat["Order"] == order_norm]
         if not matches.empty:
             return matches.iloc[0].to_dict()
         return None
 
-    def get_kmat_positions(self, kauf):
-        """Return list of available POS strings for a given Kaufnummer."""
-        if self.df_kmat is None:
-            return []
-        try:
-            kauf_norm = str(int(float(str(kauf).strip())))
-        except (ValueError, TypeError):
-            kauf_norm = str(kauf).strip()
-        rows = self.df_kmat[self.df_kmat["Special stock number"] == kauf_norm]
-        return rows["POS"].tolist()
-
-    def get_wip_orders(self, sales_order):
-        """Return list of unscanned Order strings for a given Sales Order."""
-        if self.df_wip is None:
-            return []
-        try:
-            sales_order_norm = str(int(float(str(sales_order).strip())))
-        except (ValueError, TypeError):
-            sales_order_norm = str(sales_order).strip()
-        rows = self.df_wip[self.df_wip["Sales Order"] == sales_order_norm]
-        all_orders = rows["Order"].tolist()
-        scanned = {d["order"] for d in self.inventur_data_wip}
-        return [o for o in all_orders if o not in scanned]
-
-    def suche_wip(self, sales_order, order):
-        """Look up by Sales Order + Order in df_wip. Returns row dict or None."""
+    def suche_wip(self, order):
+        """Look up by Order in df_wip. Returns row dict or None."""
         if self.df_wip is None:
             return None
-        try:
-            sales_order_norm = str(int(float(str(sales_order).strip())))
-        except (ValueError, TypeError):
-            sales_order_norm = str(sales_order).strip()
-        try:
-            order_norm = str(int(float(str(order).strip())))
-        except (ValueError, TypeError):
-            order_norm = str(order).strip()
-        matches = self.df_wip[
-            (self.df_wip["Sales Order"] == sales_order_norm) &
-            (self.df_wip["Order"] == order_norm)
-        ]
+        order_norm = _norm_num_lookup(order)
+        matches = self.df_wip[self.df_wip["Order"] == order_norm]
         if not matches.empty:
             return matches.iloc[0].to_dict()
         return None
@@ -1853,16 +1764,14 @@ class InventurAppSK:
         self.kmat_info_container.columnconfigure(3, weight=1)
 
         fields_left = [
-            ("Purchase No.:", "kmat_lbl_kauf"),
-            ("POS:", "kmat_lbl_pos"),
+            ("Sales Order:", "kmat_lbl_sales_order"),
+            ("Order:", "kmat_lbl_order"),
             ("Material No.:", "kmat_lbl_material"),
             ("Description:", "kmat_lbl_kurztext"),
         ]
         fields_right = [
             ("Plant:", "kmat_lbl_werk"),
-            ("Location:", "kmat_lbl_lort"),
             ("UOM:", "kmat_lbl_bme"),
-            ("Free Usable:", "kmat_lbl_frei"),
         ]
 
         for r, (lbl_text, attr) in enumerate(fields_left):
@@ -2054,9 +1963,9 @@ class InventurAppSK:
         if self.warehouse_mode == "Zert":
             columns = ("Time", "Charge", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "KMAT":
-            columns = ("Time", "Purchase No.", "POS", "Material No.", "Description", "Quantity", "UOM", "Status")
+            columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "WIP":
-            columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM")
+            columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM", "Status")
         else:
             columns = ("Time", "Batch No.", "Material", "Shelf Location", "Status")
 
@@ -2075,8 +1984,8 @@ class InventurAppSK:
             self.tree.column("Status", width=100, minwidth=80)
         elif self.warehouse_mode == "KMAT":
             self.tree.column("Time", width=80, minwidth=70)
-            self.tree.column("Purchase No.", width=110, minwidth=80)
-            self.tree.column("POS", width=50, minwidth=40)
+            self.tree.column("Sales Order", width=110, minwidth=80)
+            self.tree.column("Order", width=90, minwidth=70)
             self.tree.column("Material No.", width=100, minwidth=80)
             self.tree.column("Description", width=200, minwidth=120)
             self.tree.column("Quantity", width=80, minwidth=60)
@@ -2090,6 +1999,7 @@ class InventurAppSK:
             self.tree.column("Description", width=200, minwidth=120)
             self.tree.column("Quantity", width=80, minwidth=60)
             self.tree.column("UOM", width=60, minwidth=50)
+            self.tree.column("Status", width=80, minwidth=60)
         else:
             self.tree.column("Time", width=90, minwidth=70)
             self.tree.column("Batch No.", width=130, minwidth=100)
@@ -2186,77 +2096,35 @@ class InventurAppSK:
             else:
                 self.show_not_found_dialog_zert(charge)
         elif self.warehouse_mode == "KMAT":
-            kauf = raw.strip()
-
-            # Check if Kaufnummer exists at all
-            positions = self.get_kmat_positions(kauf)
-            if not positions:
-                messagebox.showerror(
-                    "Purchase Order Not Found",
-                    f"Purchase Order '{kauf}' was not found in the master table.",
-                )
-                self._reset_scan()
-                return
-
-            # Ask user to select position
-            pos_dlg = PositionInputDialog(self.root, kauf, positions)
-            if pos_dlg.result is None:
-                self._reset_scan()
-                return
-            pos = pos_dlg.result
-
-            # Duplicate check
-            combo_key = f"{kauf}#{pos}"
-            already = False
-            for item in self.inventur_data_kmat + self.not_found_data_kmat:
-                if f"{item.get('kauf', '')}#{item.get('pos', '')}" == combo_key:
-                    already = True
-                    break
-            if already:
+            order = raw.strip()
+            if self._order_already_scanned(order, self.inventur_data_kmat, self.not_found_data_kmat):
                 messagebox.showwarning(
                     "Already Scanned",
-                    f"Purchase No. '{kauf}' / POS '{pos}' has already been scanned!",
+                    f"Order '{order}' has already been scanned!",
                 )
                 self._reset_scan()
                 return
 
-            row_data = self.suche_kmat(kauf, pos)
+            row_data = self.suche_kmat(order)
             if row_data is not None:
-                self.show_found_kmat(row_data, kauf, pos)
+                self.show_found_kmat(row_data, order)
             else:
-                messagebox.showerror(
-                    "Position Not Found",
-                    f"Position '{pos}' for Purchase Order '{kauf}' was not found.",
-                )
-                self._reset_scan()
+                self.show_not_found_dialog_kmat(order)
         elif self.warehouse_mode == "WIP":
-            sales_order = self._extract_wip_sales_order(raw)
-            if sales_order != raw.strip():
-                self.logger.info(
-                    f"WIP QR code detected: extracted sales order '{sales_order}'"
-                )
-            orders = self.get_wip_orders(sales_order)
-            if not orders:
-                messagebox.showerror(
-                    "Sales Order Not Found",
-                    f"Sales Order '{sales_order}' was not found or all orders have already been recorded.",
+            order = raw.strip()
+            if self._order_already_scanned(order, self.inventur_data_wip, self.not_found_data_wip):
+                messagebox.showwarning(
+                    "Already Scanned",
+                    f"Order '{order}' has already been scanned!",
                 )
                 self._reset_scan()
                 return
-            order_dlg = WIPOrderDialog(self.root, sales_order, orders)
-            if order_dlg.result is None:
-                self._reset_scan()
-                return
-            order = order_dlg.result
-            row_data = self.suche_wip(sales_order, order)
+
+            row_data = self.suche_wip(order)
             if row_data is not None:
-                self.show_found_wip(row_data, sales_order, order)
+                self.show_found_wip(row_data, order)
             else:
-                messagebox.showerror(
-                    "Order Not Found",
-                    f"Order '{order}' for Sales Order '{sales_order}' was not found.",
-                )
-                self._reset_scan()
+                self.show_not_found_dialog_wip(order)
         else:
             row_data = self.suche_charge(charge)
             if row_data is not None:
@@ -2275,6 +2143,13 @@ class InventurAppSK:
                 if str(item.get("charge", "")) == str(charge):
                     return True
             return False
+
+    @staticmethod
+    def _order_already_scanned(order, found_list, not_found_list):
+        for item in found_list + not_found_list:
+            if str(item.get("order", "")) == str(order):
+                return True
+        return False
 
     # ------------------------------------------------------------------
     # Show found roll (SK)
@@ -2418,7 +2293,7 @@ class InventurAppSK:
     # Show found KMAT item
     # ------------------------------------------------------------------
 
-    def show_found_kmat(self, row_data, kauf, pos):
+    def show_found_kmat(self, row_data, order):
         """Display found KMAT data and show KMAT input panel."""
         def _s(val):
             if val is None:
@@ -2427,26 +2302,22 @@ class InventurAppSK:
             return "" if s.lower() == "nan" else s
 
         self.current_scan = {
-            "kauf": kauf,
-            "pos": pos,
+            "sales_order": _s(row_data.get("Sales Order", "")),
+            "order": order,
             "material": _s(row_data.get("Material Number", "")),
-            "kurztext": _s(row_data.get("Material Description", "")),
+            "kurztext": _s(row_data.get("Material description", "")),
             "werk": _s(row_data.get("Plant", "")),
-            "lort": _s(row_data.get("Storage Location", "")),
-            "bme": _s(row_data.get("Base Unit of Measure", "")),
-            "frei_verw": _s(row_data.get("Unrestricted", "")),
+            "bme": _s(row_data.get("Unit of measure (=GMEIN)", "")),
             "status": "found",
             "_mode": "kmat",
         }
 
-        self.kmat_lbl_kauf.config(text=self.current_scan["kauf"])
-        self.kmat_lbl_pos.config(text=self.current_scan["pos"])
+        self.kmat_lbl_sales_order.config(text=self.current_scan["sales_order"])
+        self.kmat_lbl_order.config(text=self.current_scan["order"])
         self.kmat_lbl_material.config(text=self.current_scan["material"])
         self.kmat_lbl_kurztext.config(text=self.current_scan["kurztext"])
         self.kmat_lbl_werk.config(text=self.current_scan["werk"])
-        self.kmat_lbl_lort.config(text=self.current_scan["lort"])
         self.kmat_lbl_bme.config(text=self.current_scan["bme"])
-        self.kmat_lbl_frei.config(text=self.current_scan["frei_verw"])
         self.kmat_lbl_bme_input.config(text=self.current_scan["bme"])
 
         self.current_frame.config(text="KMAT FOUND")
@@ -2464,7 +2335,7 @@ class InventurAppSK:
     # Show found WIP item
     # ------------------------------------------------------------------
 
-    def show_found_wip(self, row_data, sales_order, order):
+    def show_found_wip(self, row_data, order):
         """Display found WIP data and show WIP input panel."""
         def _s(val):
             if val is None:
@@ -2473,7 +2344,7 @@ class InventurAppSK:
             return "" if s.lower() == "nan" else s
 
         self.current_scan = {
-            "sales_order": sales_order,
+            "sales_order": _s(row_data.get("Sales Order", "")),
             "order": order,
             "material": _s(row_data.get("Material Number", "")),
             "kurztext": _s(row_data.get("Material description", "")),
@@ -2575,9 +2446,9 @@ class InventurAppSK:
     # Not found dialog (KMAT)
     # ------------------------------------------------------------------
 
-    def show_not_found_dialog_kmat(self, kauf, pos):
-        """Show dialog for KMAT Kauf+POS not in master table."""
-        dlg = NotFoundDialogKMAT(self.root, kauf, pos)
+    def show_not_found_dialog_kmat(self, order):
+        """Show dialog for KMAT Order not in master table."""
+        dlg = NotFoundDialogKMAT(self.root, order)
 
         if dlg.result:
             data = dlg.result.copy()
@@ -2598,9 +2469,42 @@ class InventurAppSK:
                 f"Not-found KMAT saved. Total: {total} "
                 f"({len(self.inventur_data_kmat)} found, {len(self.not_found_data_kmat)} not found)"
             )
-            self.logger.info(f"Not-found KMAT saved: {data['kauf']}/{data['pos']}")
+            self.logger.info(f"Not-found KMAT saved: {data['order']}")
         else:
             self.logger.info("KMAT not-found dialog cancelled")
+
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
+    # Not found dialog (WIP)
+    # ------------------------------------------------------------------
+
+    def show_not_found_dialog_wip(self, order):
+        """Show dialog for WIP Order not in master table."""
+        dlg = NotFoundDialogWIP(self.root, order)
+
+        if dlg.result:
+            data = dlg.result.copy()
+            data["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+            self.not_found_data_wip.append(data)
+
+            self.undo_stack.append(("add_not_found_wip", data.copy()))
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+
+            if self.config.get("auto_save", True):
+                self.save_wip_excel()
+
+            self.update_list()
+            total = len(self.inventur_data_wip) + len(self.not_found_data_wip)
+            self.status_var.set(
+                f"Not-found WIP saved. Total: {total} "
+                f"({len(self.inventur_data_wip)} found, {len(self.not_found_data_wip)} not found)"
+            )
+            self.logger.info(f"Not-found WIP saved: {data['order']}")
+        else:
+            self.logger.info("WIP not-found dialog cancelled")
 
         self._reset_scan()
 
@@ -2743,7 +2647,7 @@ class InventurAppSK:
             f"KMAT saved. Total: {total} "
             f"({len(self.inventur_data_kmat)} found, {len(self.not_found_data_kmat)} not found)"
         )
-        self.logger.info(f"KMAT scan saved: {self.current_scan['kauf']}/{self.current_scan['pos']}")
+        self.logger.info(f"KMAT scan saved: {self.current_scan['sales_order']}/{self.current_scan['order']}")
 
         self.current_frame.grid_remove()
         self._hide_all_scan_widgets()
@@ -2885,8 +2789,8 @@ class InventurAppSK:
                     "", "end",
                     values=(
                         time_part,
-                        d.get("kauf", ""),
-                        d.get("pos", ""),
+                        d.get("sales_order", ""),
+                        d.get("order", ""),
                         d.get("material", ""),
                         d.get("kurztext", ""),
                         d.get("menge", ""),
@@ -2901,7 +2805,12 @@ class InventurAppSK:
                      f"{len(self.not_found_data_kmat)} not found)"
             )
         elif self.warehouse_mode == "WIP":
-            all_items = [(d, "Found") for d in self.inventur_data_wip]
+            all_items = []
+            for d in self.inventur_data_wip:
+                all_items.append((d, "Found"))
+            for d in self.not_found_data_wip:
+                all_items.append((d, "Not Found"))
+
             all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
 
             for d, status in all_items:
@@ -2917,10 +2826,15 @@ class InventurAppSK:
                         d.get("kurztext", ""),
                         d.get("menge", ""),
                         d.get("bme", ""),
+                        status,
                     ),
                 )
 
-            self.count_label.config(text=f"{len(self.inventur_data_wip)} entries")
+            total = len(self.inventur_data_wip) + len(self.not_found_data_wip)
+            self.count_label.config(
+                text=f"{total} entries ({len(self.inventur_data_wip)} found, "
+                     f"{len(self.not_found_data_wip)} not found)"
+            )
         else:
             all_items = []
             for d in self.inventur_data:
@@ -3124,13 +3038,11 @@ class InventurAppSK:
     KMAT_HEADERS = [
         "Timestamp",
         "Plant",
-        "Location",
+        "Sales Order",
+        "Order",
         "Material No.",
         "Description",
-        "Purchase No.",
-        "POS",
         "UOM",
-        "Free Usable",
         "Recorded Quantity",
         "Remarks",
     ]
@@ -3145,13 +3057,11 @@ class InventurAppSK:
         return [
             _clean(d.get("zeitstempel", "")),
             _clean(d.get("werk", "")),
-            _clean(d.get("lort", "")),
+            _clean(d.get("sales_order", "")),
+            _clean(d.get("order", "")),
             _clean(d.get("material", "")),
             _clean(d.get("kurztext", "")),
-            _clean(d.get("kauf", "")),
-            _clean(d.get("pos", "")),
             _clean(d.get("bme", "")),
-            _clean(d.get("frei_verw", "")),
             _clean(d.get("menge", "")),
             _clean(d.get("remarks", "")),
         ]
@@ -3219,7 +3129,7 @@ class InventurAppSK:
         ]
 
     def save_wip_excel(self):
-        """Write Inventory_WIP.xlsx with Inventory sheet."""
+        """Write Inventory_WIP.xlsx with Inventory and Not_Found sheets."""
         try:
             wb = Workbook()
             if "Sheet" in wb.sheetnames:
@@ -3229,6 +3139,11 @@ class InventurAppSK:
             ws_inv.append(self.WIP_HEADERS)
             for d in self.inventur_data_wip:
                 ws_inv.append(self._row_from_wip_item(d))
+
+            ws_nf = wb.create_sheet("Not_Found")
+            ws_nf.append(self.WIP_HEADERS)
+            for d in self.not_found_data_wip:
+                ws_nf.append(self._row_from_wip_item(d))
 
             self.export_wip_path.mkdir(parents=True, exist_ok=True)
             wb.save(self.inventur_wip_path)
@@ -3385,7 +3300,8 @@ class InventurAppSK:
         loaded = 0
         try:
             df_inv = pd.read_excel(
-                self.inventur_kmat_path, sheet_name="Inventory", dtype={"Purchase No.": str, "POS": str})
+                self.inventur_kmat_path, sheet_name="Inventory",
+                dtype={"Sales Order": str, "Order": str})
             for _, row in df_inv.iterrows():
                 self.inventur_data_kmat.append(self._row_to_kmat_dict(row, status="found"))
                 loaded += 1
@@ -3394,7 +3310,8 @@ class InventurAppSK:
 
         try:
             df_nf = pd.read_excel(
-                self.inventur_kmat_path, sheet_name="Not_Found", dtype={"Purchase No.": str, "POS": str})
+                self.inventur_kmat_path, sheet_name="Not_Found",
+                dtype={"Sales Order": str, "Order": str})
             for _, row in df_nf.iterrows():
                 self.not_found_data_kmat.append(self._row_to_kmat_dict(row, status="not_found"))
                 loaded += 1
@@ -3422,13 +3339,11 @@ class InventurAppSK:
         return {
             "zeitstempel": _str(row.get("Timestamp", "")),
             "werk": _str(row.get("Plant", "")),
-            "lort": _str(row.get("Location", "")),
+            "sales_order": _str(row.get("Sales Order", "")),
+            "order": _str(row.get("Order", "")),
             "material": _str(row.get("Material No.", "")),
             "kurztext": _str(row.get("Description", "")),
-            "kauf": _str(row.get("Purchase No.", "")),
-            "pos": _str(row.get("POS", "")),
             "bme": _str(row.get("UOM", "")),
-            "frei_verw": _str(row.get("Free Usable", "")),
             "menge": _str(row.get("Recorded Quantity", "")),
             "remarks": _str(row.get("Remarks", "")),
             "status": status,
@@ -3455,9 +3370,22 @@ class InventurAppSK:
         except Exception as e:
             self.logger.error(f"Error loading WIP Inventory sheet: {e}")
 
+        try:
+            df_nf = pd.read_excel(
+                self.inventur_wip_path, sheet_name="Not_Found",
+                dtype={"Sales Order": str, "Order": str})
+            for _, row in df_nf.iterrows():
+                self.not_found_data_wip.append(self._row_to_wip_dict(row, status="not_found"))
+                loaded += 1
+        except Exception:
+            pass
+
         if loaded:
             self.update_list()
-            self.status_var.set(f"WIP session resumed: {len(self.inventur_data_wip)} entries.")
+            self.status_var.set(
+                f"WIP session resumed: {len(self.inventur_data_wip)} found, "
+                f"{len(self.not_found_data_wip)} not found."
+            )
             self.logger.info(f"Existing WIP session loaded: {loaded} rows")
 
     def _row_to_wip_dict(self, row, status):
@@ -3589,21 +3517,29 @@ class InventurAppSK:
             if self.config.get("auto_save", True):
                 self.save_zert_excel()
         elif action == "add_kmat":
-            kauf = data.get("kauf", "")
-            pos = data.get("pos", "")
+            order = data.get("order", "")
             self.inventur_data_kmat = [
-                d for d in self.inventur_data_kmat
-                if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                d for d in self.inventur_data_kmat if d.get("order") != order]
             if self.config.get("auto_save", True):
                 self.save_kmat_excel()
         elif action == "add_not_found_kmat":
-            kauf = data.get("kauf", "")
-            pos = data.get("pos", "")
+            order = data.get("order", "")
             self.not_found_data_kmat = [
-                d for d in self.not_found_data_kmat
-                if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                d for d in self.not_found_data_kmat if d.get("order") != order]
             if self.config.get("auto_save", True):
                 self.save_kmat_excel()
+        elif action == "add_wip":
+            order = data.get("order", "")
+            self.inventur_data_wip = [
+                d for d in self.inventur_data_wip if d.get("order") != order]
+            if self.config.get("auto_save", True):
+                self.save_wip_excel()
+        elif action == "add_not_found_wip":
+            order = data.get("order", "")
+            self.not_found_data_wip = [
+                d for d in self.not_found_data_wip if d.get("order") != order]
+            if self.config.get("auto_save", True):
+                self.save_wip_excel()
 
         self.update_list()
         self.status_var.set(f"Undo: removed entry for batch '{charge}'")
@@ -3638,16 +3574,13 @@ class InventurAppSK:
 
         # Find the matching entry in the data list
         if self.warehouse_mode == "KMAT":
-            kauf = values[1] if len(values) > 1 else ""
-            pos = values[2] if len(values) > 2 else ""
+            order = values[2] if len(values) > 2 else ""
             entry = next(
-                (d for d in self.inventur_data_kmat
-                 if d.get("kauf") == kauf and d.get("pos") == pos),
+                (d for d in self.inventur_data_kmat if d.get("order") == order),
                 None)
             if entry is None:
                 entry = next(
-                    (d for d in self.not_found_data_kmat
-                     if d.get("kauf") == kauf and d.get("pos") == pos),
+                    (d for d in self.not_found_data_kmat if d.get("order") == order),
                     None)
         else:
             charge = values[1] if len(values) > 1 else ""
@@ -3660,12 +3593,14 @@ class InventurAppSK:
                         (d for d in self.not_found_data_zert if d.get("charge") == charge),
                         None)
             elif self.warehouse_mode == "WIP":
-                sales_order = values[1] if len(values) > 1 else ""
                 order = values[2] if len(values) > 2 else ""
                 entry = next(
-                    (d for d in self.inventur_data_wip
-                     if d.get("sales_order") == sales_order and d.get("order") == order),
+                    (d for d in self.inventur_data_wip if d.get("order") == order),
                     None)
+                if entry is None:
+                    entry = next(
+                        (d for d in self.not_found_data_wip if d.get("order") == order),
+                        None)
             else:  # SK
                 entry = next(
                     (d for d in self.inventur_data if d.get("charge") == charge),
@@ -3841,15 +3776,15 @@ class InventurAppSK:
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
         else:  # KMAT
-            ttk.Label(frame, text="Purchase No.:", font=("Arial", 16, "bold")).grid(
+            ttk.Label(frame, text="Sales Order:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("kauf", ""), font=("Arial", 16)).grid(
+            ttk.Label(frame, text=entry.get("sales_order", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
-            ttk.Label(frame, text="POS:", font=("Arial", 16, "bold")).grid(
+            ttk.Label(frame, text="Order:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
-            ttk.Label(frame, text=entry.get("pos", ""), font=("Arial", 16)).grid(
+            ttk.Label(frame, text=entry.get("order", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
             row += 1
 
@@ -3882,7 +3817,8 @@ class InventurAppSK:
                 entry["remarks"] = new_remarks
                 self.save_kmat_excel()
                 self.update_list()
-                self.status_var.set(f"Entry updated: {entry.get('kauf', '')}/{entry.get('pos', '')}")
+                self.status_var.set(
+                    f"Entry updated: {entry.get('sales_order', '')}/{entry.get('order', '')}")
                 dlg.destroy()
 
             menge_entry.focus_set()
@@ -3912,29 +3848,26 @@ class InventurAppSK:
         values = self.tree.item(item_id, "values")
         if len(values) >= 2:
             if self.warehouse_mode == "KMAT":
-                # For KMAT: values = (Time, Purchase No., POS, ...)
-                kauf = values[1] if len(values) > 1 else ""
-                pos = values[2] if len(values) > 2 else ""
+                # For KMAT: values = (Time, Sales Order, Order, ...)
+                order = values[2] if len(values) > 2 else ""
                 self.inventur_data_kmat = [
-                    d for d in self.inventur_data_kmat
-                    if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                    d for d in self.inventur_data_kmat if d.get("order") != order]
                 self.not_found_data_kmat = [
-                    d for d in self.not_found_data_kmat
-                    if not (d.get("kauf") == kauf and d.get("pos") == pos)]
+                    d for d in self.not_found_data_kmat if d.get("order") != order]
                 self.save_kmat_excel()
                 self.update_list()
-                self.status_var.set(f"Entry deleted: {kauf}/{pos}")
-                self.logger.info(f"KMAT entry deleted: {kauf}/{pos}")
+                self.status_var.set(f"Entry deleted: {order}")
+                self.logger.info(f"KMAT entry deleted: {order}")
             elif self.warehouse_mode == "WIP":
-                sales_order = values[1] if len(values) > 1 else ""
                 order = values[2] if len(values) > 2 else ""
                 self.inventur_data_wip = [
-                    d for d in self.inventur_data_wip
-                    if not (d.get("sales_order") == sales_order and d.get("order") == order)]
+                    d for d in self.inventur_data_wip if d.get("order") != order]
+                self.not_found_data_wip = [
+                    d for d in self.not_found_data_wip if d.get("order") != order]
                 self.save_wip_excel()
                 self.update_list()
-                self.status_var.set(f"Entry deleted: {sales_order}/{order}")
-                self.logger.info(f"WIP entry deleted: {sales_order}/{order}")
+                self.status_var.set(f"Entry deleted: {order}")
+                self.logger.info(f"WIP entry deleted: {order}")
             else:
                 charge = values[1]
                 if self.warehouse_mode == "Zert":
