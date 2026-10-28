@@ -1,8 +1,8 @@
 @echo off
 :: ============================================================
-:: INVENTORY Forbo SK - Malacky Launcher
+:: INVENTORY Forbo - Launcher
 :: ============================================================
-title INVENTORY Forbo SK - Malacky
+title INVENTORY Forbo
 
 :: Change to the directory containing this batch file
 cd /d "%~dp0"
@@ -17,15 +17,15 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 :: Check if the app script exists
-if not exist "inventur_app_sk.py" (
-    echo ERROR: inventur_app_sk.py not found in %~dp0
+if not exist "inventur_app.py" (
+    echo ERROR: inventur_app.py not found in %~dp0
     pause
     exit /b 1
 )
 
 :: Launch the application
-echo Starting INVENTORY Forbo SK - Malacky...
-python inventur_app_sk.py
+echo Starting INVENTORY Forbo...
+python inventur_app.py
 
 :: If Python exited with an error, pause so the user can read the message
 if %ERRORLEVEL% NEQ 0 (

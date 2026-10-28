@@ -3,11 +3,11 @@
 ## Overview
 
 Desktop application for warehouse inventory at **Forbo**.
-Supports **four warehouse modes**: **HALB**, **ZERT**, **KMAT**, and **WIP**.
+Supports **eight warehouse modes**: **HALB**, **ZERT**, **KMAT**, **WIP**, **Assembling**, **Service**, **Warehouse** and **Granules**.
 
-- Version: **2.7**
+- Version: **3.0** (shown in the window title, the header and the start dialog)
 - Platform: Windows 11, Python 3.11+
-- Main script: `inventur_app_sk.py`
+- Main script: `inventur_app.py`
 
 ---
 
@@ -104,9 +104,26 @@ On first launch the program will ask you to locate the relevant file.
 
 > One Sales Order can contain multiple Orders. Each Order number is unique across the entire master table.
 
+**Assembling / Service / Warehouse master tables:** same columns as the HALB master table.
+Each mode has its own master table and export folder in **Settings**.
+
+**Required columns – Granules master table** (German SAP headers or English headers are both accepted):
+
+| German column | English column | Description |
+|---------------|----------------|-------------|
+| `Werk` | `Plant` | Plant |
+| `LOrt` | `Storage Location` | Storage location |
+| `Materialnummer` | `Material Number` | Material number |
+| `Materialkurztext` | `Material Description` | Material description |
+| `Charge` | `Batch` | Batch number (scanned, **required**) |
+| `Frei verwendbar` | `Unrestricted` | Free usable quantity |
+| `BME` | `Base Unit of Measure` | Unit of measure (KG) |
+
+> The Granules master table is read from the **first sheet**. Leading zeros of the batch number are ignored when searching (`0618604585` = `618604585`).
+
 ### Step 4 – Start the program
 1. Double-click `start_inventur.bat`
-2. The warehouse selection dialog opens — select **HALB**, **ZERT**, **KMAT**, or **WIP**
+2. The warehouse selection dialog opens — select one of the eight warehouse modes
 3. The application opens maximised automatically
 
 ---
@@ -116,20 +133,25 @@ On first launch the program will ask you to locate the relevant file.
 On the first launch, a dialog will appear asking you to locate the master table file.
 Use the **Settings** button at any time to change all paths.
 
-Settings are saved to `config/settings_sk.json`.
+Settings are saved to `config/settings.json`. The Settings dialog has one tab per warehouse mode.
+An existing `config/settings_sk.json` from an older version is taken over automatically on the first start.
 
 ---
 
 ## Warehouse Selection
 
-Every time the application starts, a selection dialog appears with four buttons arranged in two rows:
+Every time the application starts, a selection dialog appears with eight buttons arranged in two rows:
 
 | Button | Description |
 |--------|-------------|
-| **HALB** | Forbo HALB – Malacky warehouse (Rolls, Fach + Width input) |
+| **HALB** | HALB warehouse (Rolls, Shelf Location + Width input) |
 | **ZERT** | ZERT warehouse (Charge-based, quantity input only) |
 | **KMAT** | KMAT warehouse (Customer order + Position, quantity input) |
 | **WIP** | WIP warehouse (Sales Order + Order selection, quantity input) |
+| **ASSEMBLING** | Assembling – works like HALB, output `Inventory_Assembling.xlsx` |
+| **SERVICE** | Service – works like HALB, output `Inventory_Service.xlsx` |
+| **WAREHOUSE** | Warehouse – works like HALB, output `Inventory_Warehouse.xlsx` |
+| **GRANULES** | Granules (batch barcode, counted quantity in KG) |
 
 Closing the dialog without a selection exits the application.
 
@@ -213,7 +235,25 @@ Closing the dialog without a selection exits the application.
 4. **Duplicate protection**
    - Each Order number is unique — once recorded it no longer appears in the dropdown
 
-### QR Code Format (HALB and ZERT modes)
+### Assembling / Service / Warehouse – Basic workflow
+
+Identical to the HALB workflow. Each mode uses its own master table and writes its own
+output file `Inventory_<Mode>.xlsx`.
+
+### GRANULES – Basic workflow
+
+1. **Scan the batch barcode**
+   - The barcode contains the batch number only, e.g. `0618604585`
+2. **Batch found** — the following is displayed:
+   - Batch No., Material No., Description, Quantity (free usable, KG)
+   - Enter the **Counted Qty (KG)** (mandatory, number) and optionally a **Remark**
+   - Press **ENTER** or click **Save**
+3. **Batch not found**
+   - A manual entry dialog opens: **Material No.** (mandatory), Description, **Counted Qty (KG)** (mandatory), Remarks
+   - The entry is saved to the `Not_Found` sheet
+4. **Duplicate protection** — the same batch cannot be recorded twice
+
+### QR Code Format (HALB-type and ZERT modes)
 
 The program parses semicolon-delimited QR codes:
 
@@ -236,10 +276,11 @@ Editable fields per mode:
 
 | Mode | Editable fields |
 |------|----------------|
-| HALB | Shelf Location, Measured Width (mm), Remarks |
+| HALB / Assembling / Service / Warehouse | Shelf Location, Measured Width (mm), Remarks |
 | ZERT | Recorded Quantity, Remarks |
 | KMAT | Recorded Quantity, Remarks |
 | WIP  | Recorded Quantity, Remarks |
+| GRANULES | Counted Qty (KG), Remarks |
 
 The batch number / charge / order number is shown for reference but cannot be changed.
 The Excel file is updated automatically after saving.
@@ -269,6 +310,9 @@ The Excel file is updated automatically after saving.
 ## Output Files
 
 ### HALB: `Inventory_HALB.xlsx`
+
+Assembling, Service and Warehouse write the same structure to `Inventory_Assembling.xlsx`,
+`Inventory_Service.xlsx` and `Inventory_Warehouse.xlsx`.
 
 | Sheet | Content |
 |-------|---------|
@@ -365,6 +409,29 @@ The Excel file is updated automatically after saving.
 | Recorded Quantity | Quantity entered during scan |
 | Remarks | Optional remark |
 
+### GRANULES: `Inventory_Granules.xlsx`
+
+| Sheet | Content |
+|-------|---------|
+| `Inventory` | All batches found in the master table |
+| `Not_Found` | Batches entered manually (not in the master table) |
+
+**Column structure:**
+
+| Column | Description |
+|--------|-------------|
+| Timestamp | Date and time of scan |
+| Plant | Plant code |
+| Location | Storage location |
+| Material No. | Material number |
+| Description | Material description |
+| Batch No. | Batch number (text, leading zeros kept) |
+| Free Usable | Free usable quantity from master table |
+| UOM | Unit of measure |
+| Counted Qty (KG) | Quantity entered during scan |
+| Difference (KG) | Counted Qty − Free Usable (empty for not-found batches) |
+| Remarks | Optional remark |
+
 ---
 
 ## Auto-Save
@@ -382,6 +449,8 @@ Click **Export / Backup** to create a timestamped copy of the current inventory 
 - ZERT mode: `backups/Inventory_ZERT_Backup_YYYYMMDD_HHMMSS.xlsx`
 - KMAT mode: `backups/Inventory_KMAT_Backup_YYYYMMDD_HHMMSS.xlsx`
 - WIP mode:  `backups/Inventory_WIP_Backup_YYYYMMDD_HHMMSS.xlsx`
+- Assembling / Service / Warehouse: `backups/Inventory_<Mode>_Backup_YYYYMMDD_HHMMSS.xlsx`
+- GRANULES mode: `backups/Inventory_Granules_Backup_YYYYMMDD_HHMMSS.xlsx`
 
 The original file is not modified.
 
@@ -407,7 +476,7 @@ At the start of a new inventory cycle:
 
 ```
 inventur-programm-f/
-├── inventur_app_sk.py        # Main application
+├── inventur_app.py           # Main application
 ├── install_python.bat        # Python installation script
 ├── start_inventur.bat        # Application launcher
 ├── requirements.txt          # Python dependencies
@@ -417,27 +486,29 @@ inventur-programm-f/
 ├── Inventory_ZERT.xlsx       # ZERT inventory output (auto-created)
 ├── Inventory_KMAT.xlsx       # KMAT inventory output (auto-created)
 ├── Inventory_WIP.xlsx        # WIP inventory output (auto-created)
+├── Inventory_<Mode>.xlsx     # Assembling / Service / Warehouse / Granules output (auto-created)
 ├── backups/                  # Timestamped backup files
 ├── Daten/
 │   ├── Arbeitstabelle_Rollen_St012_EN.XLSX   # HALB master table
 │   ├── Arbeitstabelle_ZERT_EN.xlsx           # ZERT master table
 │   ├── Arbeitstabelle_KMAT_EN.xlsx           # KMAT master table
-│   └── Arbeitstabelle_WIP.xlsx               # WIP master table
+│   ├── Arbeitstabelle_WIP.xlsx               # WIP master table
+│   └── Arbeitstabelle_Granulate.xlsx         # Granules master table
 └── config/
-    ├── settings_sk.json      # Application settings
-    └── inventory_sk.log      # Log file
+    ├── settings.json         # Application settings
+    └── inventory.log         # Log file
 ```
 
 ---
 
 ## Configuration
 
-Settings file: `config/settings_sk.json`
+Settings file: `config/settings.json`
 
 ```json
 {
   "auto_save": true,
-  "arbeitstabelle_path": "C:/path/to/sk_master_table.xlsx",
+  "arbeitstabelle_path": "C:/path/to/halb_master_table.xlsx",
   "export_path": "C:/path/to/output/folder",
   "arbeitstabelle_zert_path": "C:/path/to/zert_master_table.xlsx",
   "export_zert_path": "C:/path/to/zert/output/folder",
@@ -445,6 +516,14 @@ Settings file: `config/settings_sk.json`
   "export_kmat_path": "C:/path/to/kmat/output/folder",
   "arbeitstabelle_wip_path": "C:/path/to/wip_master_table.xlsx",
   "export_wip_path": "C:/path/to/wip/output/folder",
+  "arbeitstabelle_assembling_path": "C:/path/to/assembling_master_table.xlsx",
+  "export_assembling_path": "C:/path/to/assembling/output/folder",
+  "arbeitstabelle_service_path": "C:/path/to/service_master_table.xlsx",
+  "export_service_path": "C:/path/to/service/output/folder",
+  "arbeitstabelle_warehouse_path": "C:/path/to/warehouse_master_table.xlsx",
+  "export_warehouse_path": "C:/path/to/warehouse/output/folder",
+  "arbeitstabelle_granules_path": "C:/path/to/granules_master_table.xlsx",
+  "export_granules_path": "C:/path/to/granules/output/folder",
   "vollbild": true,
   "show_switch_warehouse": false
 }
@@ -461,6 +540,8 @@ Settings file: `config/settings_sk.json`
 | `export_kmat_path` | Folder for KMAT inventory file and backups |
 | `arbeitstabelle_wip_path` | Full path to the WIP master table Excel file |
 | `export_wip_path` | Folder for WIP inventory file and backups |
+| `arbeitstabelle_<mode>_path` | Master table for `assembling`, `service`, `warehouse`, `granules` |
+| `export_<mode>_path` | Output folder for `assembling`, `service`, `warehouse`, `granules` |
 | `vollbild` | Start maximised (`true` recommended) |
 | `show_switch_warehouse` | Show the **Switch Warehouse** button in the toolbar (default: `false`) |
 
@@ -468,7 +549,7 @@ Settings file: `config/settings_sk.json`
 
 ## Log File
 
-All activity is logged to `config/inventory_sk.log`:
+All activity is logged to `config/inventory.log`:
 
 - Application start / stop
 - Warehouse mode selected
@@ -523,7 +604,7 @@ All activity is logged to `config/inventory_sk.log`:
 ## Support
 
 If problems persist:
-1. Check `config/inventory_sk.log` for error details
+1. Check `config/inventory.log` for error details
 2. Restart the application
 3. Contact IT support and attach the log file
 
@@ -533,6 +614,14 @@ If problems persist:
 
 ## Changelog
 
+### Version 3.0 – October 2026
+- **Feature – New warehouse modes:** **Assembling**, **Service** and **Warehouse** (work like HALB, each with its own master table, export folder and `Inventory_<Mode>.xlsx`).
+- **Feature – Granules mode:** scan batch barcode, enter counted quantity in KG. Batches not in the master table are entered manually and saved to the `Not_Found` sheet. Output contains a `Difference (KG)` column. German SAP column headers are accepted.
+- **UI – Version number** shown in window title, header and start dialog.
+- **UI – Settings dialog** with one tab per warehouse mode.
+- **UI – English wording:** "Charge" replaced by "Batch No." in all visible texts (ZERT Excel column now `Batch No.`; older files with `Charge` are still loaded).
+- **General:** All site-specific references removed. Files renamed: `inventur_app.py`, `start_inventur.bat`, `config/settings.json` (old settings are migrated automatically), `config/inventory.log`.
+
 ### Version 2.6 – June 2026
 - **UI – Full English translation:** All remaining German text in dialogs, error messages, and labels has been replaced with English. The startup warehouse selection dialog no longer shows bilingual text.
 - **UI – "Kauf-Nr." renamed to "Purchase No.":** All visible labels, column headers, and error messages now use "Purchase No." consistently (internal variable names and Excel column headers updated accordingly).
@@ -540,7 +629,7 @@ If problems persist:
 - **Feature – Switch Warehouse button:** A new **Switch Warehouse** button can be shown in the toolbar via **Settings → Show 'Switch Warehouse' button**. It is hidden by default and intended for presentations. Clicking it asks for confirmation and restarts the application, showing the warehouse selection dialog again.
 
 ### Version 2.5 – May 2026
-- **Bug fix – WIP Edit entry:** "Entry not found in data" error when trying to edit a WIP entry is resolved. The lookup now correctly searches `sales_order` + `order` in the WIP data list instead of falling back to the HALB/SK data.
+- **Bug fix – WIP Edit entry:** "Entry not found in data" error when trying to edit a WIP entry is resolved. The lookup now correctly searches `sales_order` + `order` in the WIP data list instead of falling back to the HALB data.
 - **Bug fix – WIP Delete entry:** Same root cause fixed for delete — WIP entries are now removed from the correct data list.
 - **UI – WIP scan dialog (Order selection popup):** All font sizes doubled (labels, combobox input, dropdown list). Window enlarged from 400×200 to 600×350 px.
 - **UI – WIP info panel:** All label and value font sizes doubled (9→18, 10→20).
@@ -553,4 +642,4 @@ If problems persist:
 ---
 
 **Developed for Forbo Movement Systems**
-*Version 2.6 – June 2026*
+*Version 3.0 – October 2026*

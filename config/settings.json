@@ -1,0 +1,21 @@
+{
+  "auto_save": true,
+  "vollbild": true,
+  "show_switch_warehouse": false,
+  "arbeitstabelle_path": "",
+  "export_path": "",
+  "arbeitstabelle_zert_path": "",
+  "export_zert_path": "",
+  "arbeitstabelle_kmat_path": "",
+  "export_kmat_path": "",
+  "arbeitstabelle_wip_path": "",
+  "export_wip_path": "",
+  "arbeitstabelle_assembling_path": "",
+  "export_assembling_path": "",
+  "arbeitstabelle_service_path": "",
+  "export_service_path": "",
+  "arbeitstabelle_warehouse_path": "",
+  "export_warehouse_path": "",
+  "arbeitstabelle_granules_path": "",
+  "export_granules_path": ""
+}

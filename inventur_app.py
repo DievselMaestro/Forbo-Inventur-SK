@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-INVENTORY PROGRAM FOR FORBO SK - MALACKY WAREHOUSE MANAGEMENT
-==============================================================
+INVENTORY PROGRAM FOR FORBO - WAREHOUSE MANAGEMENT
+==================================================
 
 Desktop application for warehouse inventory with barcode scanner integration.
-Supports Rolls only (no granulate).
-Supports two warehouse modes: SK (Malacky), Zert, HALB and WIP.
+Warehouse modes: HALB, ZERT, KMAT, WIP, Assembling, Service, Warehouse, Granules.
+Assembling, Service and Warehouse behave like HALB (rolls).
 Developed for Windows 11, Python 3.11+
 
-Date: Juni 2026
-Version: 2.8 SK+Zert
+Date: October 2026
 """
 
 import tkinter as tk
@@ -25,6 +24,60 @@ import shutil
 from pathlib import Path
 import json
 import logging
+
+
+APP_VERSION = "3.0"
+
+# HALB-type modes share the roll workflow (QR + Shelf Location + Measured Width).
+# Value = config key suffix: arbeitstabelle{suffix}_path / export{suffix}_path.
+# Output file: Inventory_<mode>.xlsx
+HALB_MODES = {
+    "HALB": "",
+    "Assembling": "_assembling",
+    "Service": "_service",
+    "Warehouse": "_warehouse",
+}
+
+# Mode id -> (display name, colour). Order = order of buttons and settings tabs.
+MODES = {
+    "HALB": ("HALB", "#1f4e79"),
+    "Zert": ("ZERT", "#375623"),
+    "KMAT": ("KMAT", "#6b1f1f"),
+    "WIP": ("WIP", "#4a3728"),
+    "Assembling": ("ASSEMBLING", "#2f5f8f"),
+    "Service": ("SERVICE", "#5b3f7a"),
+    "Warehouse": ("WAREHOUSE", "#1f6b6b"),
+    "Granules": ("GRANULES", "#8a5a00"),
+}
+
+# Mode id -> (master table config key, export folder config key)
+MODE_CONFIG_KEYS = {
+    **{m: (f"arbeitstabelle{s}_path", f"export{s}_path") for m, s in HALB_MODES.items()},
+    "Zert": ("arbeitstabelle_zert_path", "export_zert_path"),
+    "KMAT": ("arbeitstabelle_kmat_path", "export_kmat_path"),
+    "WIP": ("arbeitstabelle_wip_path", "export_wip_path"),
+    "Granules": ("arbeitstabelle_granules_path", "export_granules_path"),
+}
+
+# Granules master table: SAP export may come with German or English headers.
+# Maps every accepted header to the internal (English) column name.
+GRANULES_COLUMN_MAP = {
+    "Werk": "Plant",
+    "Plant": "Plant",
+    "LOrt": "Storage Location",
+    "Storage Location": "Storage Location",
+    "Materialnummer": "Material Number",
+    "Material": "Material Number",
+    "Material Number": "Material Number",
+    "Materialkurztext": "Material Description",
+    "Material Description": "Material Description",
+    "Charge": "Batch",
+    "Batch": "Batch",
+    "Frei verwendbar": "Unrestricted",
+    "Unrestricted": "Unrestricted",
+    "BME": "Base Unit of Measure",
+    "Base Unit of Measure": "Base Unit of Measure",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +108,30 @@ def _norm_num_lookup(x):
         return s
 
 
+def _batch_key(x):
+    """Granules batch key: stripped, leading zeros ignored (0618604585 == 618604585)."""
+    s = str(x).strip() if x is not None else ""
+    if s.lower() == "nan":
+        return ""
+    return s.lstrip("0") or s
+
+
+def _to_float(x):
+    """Parse a quantity (accepts decimal comma). Returns None if not numeric."""
+    try:
+        return float(str(x).strip().replace(",", "."))
+    except (ValueError, TypeError):
+        return None
+
+
+def _fmt_qty(x):
+    """Format a numeric value without trailing .0; non-numeric values unchanged."""
+    f = _to_float(x)
+    if f is None:
+        return "" if x is None or str(x).lower() == "nan" else str(x)
+    return str(int(f)) if f.is_integer() else f"{f:g}"
+
+
 # ---------------------------------------------------------------------------
 # Warehouse Selection Dialog
 # ---------------------------------------------------------------------------
@@ -66,14 +143,14 @@ class WarehouseSelectionDialog:
         self.result = None
 
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Select Warehouse")
-        self.dialog.geometry("640x310")
+        self.dialog.title(f"Select Warehouse - Inventory Forbo v{APP_VERSION}")
+        self.dialog.geometry("900x340")
         self.dialog.resizable(False, False)
         self.dialog.grab_set()
         # Center on screen
         self.dialog.update_idletasks()
-        x = (self.dialog.winfo_screenwidth() // 2) - 320
-        y = (self.dialog.winfo_screenheight() // 2) - 155
+        x = (self.dialog.winfo_screenwidth() // 2) - 450
+        y = (self.dialog.winfo_screenheight() // 2) - 170
         self.dialog.geometry(f"+{x}+{y}")
         self.dialog.protocol("WM_DELETE_WINDOW", self._cancel)
 
@@ -91,55 +168,26 @@ class WarehouseSelectionDialog:
             justify=tk.CENTER,
         ).pack(pady=(0, 20))
 
-        row1_frame = ttk.Frame(frame)
-        row1_frame.pack(pady=(0, 10))
+        # 4 buttons per row
+        mode_ids = list(MODES)
+        for start in range(0, len(mode_ids), 4):
+            row_frame = ttk.Frame(frame)
+            row_frame.pack(pady=(0, 10))
+            for i, mode in enumerate(mode_ids[start:start + 4]):
+                label, color = MODES[mode]
+                tk.Button(
+                    row_frame,
+                    text=label,
+                    font=("Arial", 14, "bold"),
+                    bg=color,
+                    fg="white",
+                    width=14,
+                    height=2,
+                    command=lambda m=mode: self._select(m),
+                ).pack(side=tk.LEFT, padx=(0 if i == 0 else 20, 0))
 
-        tk.Button(
-            row1_frame,
-            text="HALB",
-            font=("Arial", 14, "bold"),
-            bg="#1f4e79",
-            fg="white",
-            width=14,
-            height=2,
-            command=lambda: self._select("SK"),
-        ).pack(side=tk.LEFT, padx=(0, 20))
-
-        tk.Button(
-            row1_frame,
-            text="ZERT",
-            font=("Arial", 14, "bold"),
-            bg="#375623",
-            fg="white",
-            width=14,
-            height=2,
-            command=lambda: self._select("Zert"),
-        ).pack(side=tk.LEFT)
-
-        row2_frame = ttk.Frame(frame)
-        row2_frame.pack()
-
-        tk.Button(
-            row2_frame,
-            text="KMAT",
-            font=("Arial", 14, "bold"),
-            bg="#6b1f1f",
-            fg="white",
-            width=14,
-            height=2,
-            command=lambda: self._select("KMAT"),
-        ).pack(side=tk.LEFT, padx=(0, 20))
-
-        tk.Button(
-            row2_frame,
-            text="WIP",
-            font=("Arial", 14, "bold"),
-            bg="#4a3728",
-            fg="white",
-            width=14,
-            height=2,
-            command=lambda: self._select("WIP"),
-        ).pack(side=tk.LEFT)
+        ttk.Label(frame, text=f"Version {APP_VERSION}", font=("Arial", 9),
+                  foreground="gray").pack(side=tk.BOTTOM, anchor=tk.E)
 
     def _select(self, mode):
         self.result = mode
@@ -155,15 +203,17 @@ class WarehouseSelectionDialog:
 # ---------------------------------------------------------------------------
 
 class SettingsDialog:
-    """Dialog for configuring file paths (master table + export folder)."""
+    """Dialog for configuring file paths (master table + export folder) per mode.
+    One tab per warehouse mode; the tab of the active mode is selected."""
 
-    def __init__(self, parent, current_config):
+    def __init__(self, parent, current_config, current_mode=None):
         self.result = None
         self.config = current_config.copy()
+        self._path_vars = {}  # config key -> StringVar
 
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Settings")
-        self.dialog.geometry("620x700")
+        self.dialog.geometry("660x360")
         self.dialog.resizable(True, False)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -171,110 +221,46 @@ class SettingsDialog:
             "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
         )
 
-        self._build_widgets()
+        self._build_widgets(current_mode)
         self.dialog.wait_window()
 
-    def _build_widgets(self):
+    def _build_widgets(self, current_mode):
         frame = ttk.Frame(self.dialog, padding="15")
         frame.pack(fill=tk.BOTH, expand=True)
-
-        # --- SK Master Table path ---
-        ttk.Label(frame, text="SK Master Table file (*.xlsx):", font=("Arial", 10, "bold")).grid(
-            row=0, column=0, sticky=tk.W, pady=(0, 4))
-
-        self.master_path_var = tk.StringVar(
-            value=self.config.get("arbeitstabelle_path", ""))
-        master_entry = ttk.Entry(frame, textvariable=self.master_path_var, width=55)
-        master_entry.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_master).grid(
-            row=1, column=1, sticky=tk.W)
-
-        # --- SK Export folder ---
-        ttk.Label(frame, text="SK Export output folder:", font=("Arial", 10, "bold")).grid(
-            row=2, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.export_path_var = tk.StringVar(
-            value=self.config.get("export_path", ""))
-        export_entry = ttk.Entry(frame, textvariable=self.export_path_var, width=55)
-        export_entry.grid(row=3, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_export).grid(
-            row=3, column=1, sticky=tk.W)
-
-        # --- Zert Master Table path ---
-        ttk.Label(frame, text="Zert Master Table (*.xlsx):", font=("Arial", 10, "bold")).grid(
-            row=4, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.zert_master_path_var = tk.StringVar(
-            value=self.config.get("arbeitstabelle_zert_path", ""))
-        zert_master_entry = ttk.Entry(frame, textvariable=self.zert_master_path_var, width=55)
-        zert_master_entry.grid(row=5, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_zert_master).grid(
-            row=5, column=1, sticky=tk.W)
-
-        # --- Zert Export folder ---
-        ttk.Label(frame, text="Zert Export folder:", font=("Arial", 10, "bold")).grid(
-            row=6, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.zert_export_path_var = tk.StringVar(
-            value=self.config.get("export_zert_path", ""))
-        zert_export_entry = ttk.Entry(frame, textvariable=self.zert_export_path_var, width=55)
-        zert_export_entry.grid(row=7, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_zert_export).grid(
-            row=7, column=1, sticky=tk.W)
-
-        # --- KMAT Master Table path ---
-        ttk.Label(frame, text="KMAT Master Table (*.xlsx):", font=("Arial", 10, "bold")).grid(
-            row=8, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.kmat_master_path_var = tk.StringVar(
-            value=self.config.get("arbeitstabelle_kmat_path", ""))
-        kmat_master_entry = ttk.Entry(frame, textvariable=self.kmat_master_path_var, width=55)
-        kmat_master_entry.grid(row=9, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_kmat_master).grid(
-            row=9, column=1, sticky=tk.W)
-
-        # --- KMAT Export folder ---
-        ttk.Label(frame, text="KMAT Export folder:", font=("Arial", 10, "bold")).grid(
-            row=10, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.kmat_export_path_var = tk.StringVar(
-            value=self.config.get("export_kmat_path", ""))
-        kmat_export_entry = ttk.Entry(frame, textvariable=self.kmat_export_path_var, width=55)
-        kmat_export_entry.grid(row=11, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_kmat_export).grid(
-            row=11, column=1, sticky=tk.W)
-
-        # --- WIP Master Table path ---
-        ttk.Label(frame, text="WIP Master Table:", font=("Arial", 10, "bold")).grid(
-            row=12, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.wip_master_path_var = tk.StringVar(
-            value=self.config.get("arbeitstabelle_wip_path", ""))
-        wip_master_entry = ttk.Entry(frame, textvariable=self.wip_master_path_var, width=55)
-        wip_master_entry.grid(row=13, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_wip_master).grid(
-            row=13, column=1, sticky=tk.W)
-
-        # --- WIP Export folder ---
-        ttk.Label(frame, text="WIP Export Folder:", font=("Arial", 10, "bold")).grid(
-            row=14, column=0, sticky=tk.W, pady=(16, 4))
-
-        self.wip_export_path_var = tk.StringVar(
-            value=self.config.get("export_wip_path", ""))
-        wip_export_entry = ttk.Entry(frame, textvariable=self.wip_export_path_var, width=55)
-        wip_export_entry.grid(row=15, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
-
-        ttk.Button(frame, text="Browse...", command=self._browse_wip_export).grid(
-            row=15, column=1, sticky=tk.W)
-
         frame.columnconfigure(0, weight=1)
+
+        notebook = ttk.Notebook(frame)
+        notebook.grid(row=0, column=0, sticky=(tk.W, tk.E))
+
+        for mode, (label, _color) in MODES.items():
+            master_key, export_key = MODE_CONFIG_KEYS[mode]
+            tab = ttk.Frame(notebook, padding="12")
+            tab.columnconfigure(0, weight=1)
+            notebook.add(tab, text=label)
+            if mode == current_mode:
+                notebook.select(tab)
+
+            # --- Master Table path ---
+            ttk.Label(tab, text=f"{label} Master Table file (*.xlsx):",
+                      font=("Arial", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=(0, 4))
+            master_var = tk.StringVar(value=self.config.get(master_key, ""))
+            ttk.Entry(tab, textvariable=master_var, width=55).grid(
+                row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+            ttk.Button(tab, text="Browse...",
+                       command=lambda v=master_var, l=label: self._browse_file(v, l)).grid(
+                row=1, column=1, sticky=tk.W)
+            self._path_vars[master_key] = master_var
+
+            # --- Export folder ---
+            ttk.Label(tab, text=f"{label} Export output folder:",
+                      font=("Arial", 10, "bold")).grid(row=2, column=0, sticky=tk.W, pady=(16, 4))
+            export_var = tk.StringVar(value=self.config.get(export_key, ""))
+            ttk.Entry(tab, textvariable=export_var, width=55).grid(
+                row=3, column=0, sticky=(tk.W, tk.E), padx=(0, 8))
+            ttk.Button(tab, text="Browse...",
+                       command=lambda v=export_var, l=label: self._browse_dir(v, l)).grid(
+                row=3, column=1, sticky=tk.W)
+            self._path_vars[export_key] = export_var
 
         # --- Switch Warehouse button toggle ---
         self.switch_warehouse_var = tk.BooleanVar(
@@ -283,81 +269,39 @@ class SettingsDialog:
             frame,
             text="Show 'Switch Warehouse' button (for presentations)",
             variable=self.switch_warehouse_var,
-        ).grid(row=16, column=0, columnspan=2, sticky=tk.W, pady=(20, 0))
+        ).grid(row=1, column=0, sticky=tk.W, pady=(16, 0))
 
         # --- Buttons ---
         btn_frame = ttk.Frame(frame)
-        btn_frame.grid(row=17, column=0, columnspan=2, pady=(16, 0))
+        btn_frame.grid(row=2, column=0, pady=(16, 0))
 
         ttk.Button(btn_frame, text="Save", command=self._save, width=12).pack(
             side=tk.LEFT, padx=(0, 12))
         ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=12).pack(
             side=tk.LEFT)
 
+        ttk.Label(frame, text=f"Version {APP_VERSION}", font=("Arial", 9),
+                  foreground="gray").grid(row=3, column=0, sticky=tk.E, pady=(8, 0))
+
         self.dialog.bind("<Return>", lambda e: self._save())
         self.dialog.bind("<Escape>", lambda e: self._cancel())
 
-    def _browse_master(self):
+    def _browse_file(self, var, label):
         path = filedialog.askopenfilename(
-            title="Select SK Master Table file",
+            title=f"Select {label} Master Table file",
             filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
         )
         if path:
-            self.master_path_var.set(path)
+            var.set(path)
 
-    def _browse_export(self):
-        path = filedialog.askdirectory(title="Select SK Export output folder")
+    def _browse_dir(self, var, label):
+        path = filedialog.askdirectory(title=f"Select {label} Export output folder")
         if path:
-            self.export_path_var.set(path)
-
-    def _browse_zert_master(self):
-        path = filedialog.askopenfilename(
-            title="Select Zert Master Table file",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-        )
-        if path:
-            self.zert_master_path_var.set(path)
-
-    def _browse_zert_export(self):
-        path = filedialog.askdirectory(title="Select Zert Export output folder")
-        if path:
-            self.zert_export_path_var.set(path)
-
-    def _browse_kmat_master(self):
-        path = filedialog.askopenfilename(
-            title="Select KMAT Master Table file",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-        )
-        if path:
-            self.kmat_master_path_var.set(path)
-
-    def _browse_kmat_export(self):
-        path = filedialog.askdirectory(title="Select KMAT Export output folder")
-        if path:
-            self.kmat_export_path_var.set(path)
-
-    def _browse_wip_master(self):
-        path = filedialog.askopenfilename(
-            title="Select WIP Master Table file",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-        )
-        if path:
-            self.wip_master_path_var.set(path)
-
-    def _browse_wip_export(self):
-        path = filedialog.askdirectory(title="Select WIP Export output folder")
-        if path:
-            self.wip_export_path_var.set(path)
+            var.set(path)
 
     def _save(self):
-        self.config["arbeitstabelle_path"] = self.master_path_var.get().strip()
-        self.config["export_path"] = self.export_path_var.get().strip()
-        self.config["arbeitstabelle_zert_path"] = self.zert_master_path_var.get().strip()
-        self.config["export_zert_path"] = self.zert_export_path_var.get().strip()
-        self.config["arbeitstabelle_kmat_path"] = self.kmat_master_path_var.get().strip()
-        self.config["export_kmat_path"] = self.kmat_export_path_var.get().strip()
-        self.config["arbeitstabelle_wip_path"] = self.wip_master_path_var.get().strip()
-        self.config["export_wip_path"] = self.wip_export_path_var.get().strip()
+        for key, var in self._path_vars.items():
+            self.config[key] = var.get().strip()
         self.config["show_switch_warehouse"] = self.switch_warehouse_var.get()
         self.result = self.config
         self.dialog.destroy()
@@ -368,10 +312,10 @@ class SettingsDialog:
 
 
 # ---------------------------------------------------------------------------
-# NotFoundDialogSK
+# NotFoundDialogHALB
 # ---------------------------------------------------------------------------
 
-class NotFoundDialogSK:
+class NotFoundDialogHALB:
     """Dialog for rolls not found in the master table.
     Pre-fills Batch No., Location and all QR dimensions; user supplies Material,
     Description, Shelf Location (mandatory) and Remarks (optional).
@@ -531,7 +475,7 @@ class NotFoundDialogSK:
 # ---------------------------------------------------------------------------
 
 class NotFoundDialogZert:
-    """Dialog for Zert warehouse: charge not found in master table.
+    """Dialog for Zert warehouse: batch not found in master table.
     User supplies Material No. (mandatory), Quantity (mandatory), Remarks (optional).
     """
 
@@ -539,7 +483,7 @@ class NotFoundDialogZert:
         self.result = None
 
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Charge Not Found - Manual Entry")
+        self.dialog.title("Batch Not Found - Manual Entry")
         self.dialog.geometry("720x520")
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
@@ -557,7 +501,7 @@ class NotFoundDialogZert:
 
         ttk.Label(
             frame,
-            text=f"Charge not found!\nCharge: {self._charge}",
+            text=f"Batch not found!\nBatch No.: {self._charge}",
             font=("Arial", 20, "bold"),
             foreground="red",
             justify=tk.CENTER,
@@ -565,7 +509,7 @@ class NotFoundDialogZert:
 
         info_frame = ttk.LabelFrame(frame, text="QR Data (read-only)", padding="8")
         info_frame.pack(fill=tk.X, pady=(0, 12))
-        ttk.Label(info_frame, text="Charge:", font=("Arial", 16, "bold")).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(info_frame, text="Batch No.:", font=("Arial", 16, "bold")).grid(row=0, column=0, sticky=tk.W)
         ttk.Label(info_frame, text=self._charge, font=("Arial", 16)).grid(row=0, column=1, sticky=tk.W, padx=(8, 0))
 
         manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
@@ -803,11 +747,114 @@ class NotFoundDialogWIP:
 
 
 # ---------------------------------------------------------------------------
+# NotFoundDialogGranules
+# ---------------------------------------------------------------------------
+
+class NotFoundDialogGranules:
+    """Dialog for Granules: batch not found in master table.
+    User supplies Material No. (mandatory), Description (optional),
+    Counted Qty in KG (mandatory, numeric) and Remarks (optional).
+    """
+
+    def __init__(self, parent, charge):
+        self.result = None
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Batch Not Found - Manual Entry")
+        self.dialog.geometry("760x600")
+        self.dialog.resizable(True, True)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.geometry(
+            "+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60)
+        )
+        self._charge = charge
+        self._build_widgets()
+        self.dialog.wait_window()
+
+    def _build_widgets(self):
+        frame = ttk.Frame(self.dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text=f"Batch not found!\nBatch No.: {self._charge}",
+            font=("Arial", 20, "bold"),
+            foreground="red",
+            justify=tk.CENTER,
+        ).pack(pady=(0, 16))
+
+        manual_frame = ttk.LabelFrame(frame, text="Manual Input", padding="8")
+        manual_frame.pack(fill=tk.X, pady=(0, 16))
+
+        self.material_var = tk.StringVar()
+        self.kurztext_var = tk.StringVar()
+        self.menge_var = tk.StringVar()
+        self.remarks_var = tk.StringVar()
+
+        fields = [
+            ("Material No. *:", self.material_var, 28),
+            ("Description:", self.kurztext_var, 28),
+            ("Counted Qty (KG) *:", self.menge_var, 14),
+            ("Remarks:", self.remarks_var, 28),
+        ]
+        entries = []
+        for r, (label, var, width) in enumerate(fields):
+            ttk.Label(manual_frame, text=label, font=("Arial", 18)).grid(
+                row=r, column=0, sticky=tk.W, pady=6)
+            entry = ttk.Entry(manual_frame, textvariable=var, width=width, font=("Arial", 20))
+            entry.grid(row=r, column=1, sticky=tk.W, padx=(12, 0), pady=6)
+            entries.append(entry)
+        entries[0].focus_set()
+        for entry, nxt in zip(entries, entries[1:]):
+            entry.bind("<Return>", lambda e, n=nxt: n.focus_set())
+        entries[-1].bind("<Return>", lambda e: self._save())
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=(12, 0))
+        ttk.Button(btn_frame, text="Save", command=self._save, width=14).pack(side=tk.LEFT, padx=(0, 16))
+        ttk.Button(btn_frame, text="Cancel", command=self._cancel, width=14).pack(side=tk.LEFT)
+
+        self.dialog.bind("<Escape>", lambda e: self._cancel())
+
+    def _save(self):
+        material = self.material_var.get().strip()
+        menge = self.menge_var.get().strip()
+        if not material:
+            messagebox.showerror("Error", "Material No. is a required field.", parent=self.dialog)
+            return
+        if not menge:
+            messagebox.showerror("Error", "Counted Qty (KG) is a required field.", parent=self.dialog)
+            return
+        if _to_float(menge) is None:
+            messagebox.showerror("Error", "Counted Qty (KG) must be a number.", parent=self.dialog)
+            return
+        self.result = {
+            "charge": self._charge,
+            "material": material,
+            "kurztext": self.kurztext_var.get().strip(),
+            "werk": "",
+            "lort": "",
+            "bme": "KG",
+            "frei_verw": "",
+            "menge": menge,
+            "remarks": self.remarks_var.get().strip(),
+            "status": "not_found",
+            "_mode": "granules",
+        }
+        self.dialog.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.dialog.destroy()
+
+
+# ---------------------------------------------------------------------------
 # Main Application Class
 # ---------------------------------------------------------------------------
 
-class InventurAppSK:
-    """Inventory application for Forbo SK (Malacky) — Rolls only. Also supports Zert warehouse."""
+class InventurApp:
+    """Forbo inventory application. One warehouse mode per session (see MODES)."""
 
     # ------------------------------------------------------------------
     # Initialisation
@@ -855,8 +902,10 @@ class InventurAppSK:
             self.load_existing_kmat()
         elif self.warehouse_mode == "WIP":
             self.load_existing_wip()
+        elif self.warehouse_mode == "Granules":
+            self.load_existing_granules()
         else:
-            self.load_existing_cz()
+            self.load_existing_halb()
 
         # Shortcuts
         self.bind_shortcuts()
@@ -873,16 +922,20 @@ class InventurAppSK:
 
     def _resolve_paths(self):
         """Derive runtime paths from config."""
-        arb = self.config.get("arbeitstabelle_path", "")
+        # HALB-type paths (HALB, Assembling, Service, Warehouse share the roll workflow)
+        self.halb_mode = self.warehouse_mode if self.warehouse_mode in HALB_MODES else "HALB"
+        self.master_key, self.export_key = MODE_CONFIG_KEYS[self.halb_mode]
+
+        arb = self.config.get(self.master_key, "")
         self.arbeitstabelle_path = Path(arb) if arb else None
 
-        exp = self.config.get("export_path", "")
+        exp = self.config.get(self.export_key, "")
         if exp:
             self.export_path = Path(exp)
         else:
             self.export_path = self.base_dir
 
-        self.inventur_path = self.export_path / "Inventory_HALB.xlsx"
+        self.inventur_path = self.export_path / f"Inventory_{self.halb_mode}.xlsx"
         backup_dir = self.export_path / "backups"
         try:
             backup_dir.mkdir(parents=True, exist_ok=True)
@@ -912,13 +965,20 @@ class InventurAppSK:
         self.export_wip_path = Path(wip_exp) if wip_exp else self.base_dir
         self.inventur_wip_path = self.export_wip_path / "Inventory_WIP.xlsx"
 
+        # Granules paths
+        gran_arb = self.config.get("arbeitstabelle_granules_path", "")
+        self.arbeitstabelle_granules_path = Path(gran_arb) if gran_arb else None
+        gran_exp = self.config.get("export_granules_path", "")
+        self.export_granules_path = Path(gran_exp) if gran_exp else self.base_dir
+        self.inventur_granules_path = self.export_granules_path / "Inventory_Granules.xlsx"
+
     # ------------------------------------------------------------------
     # Logging
     # ------------------------------------------------------------------
 
     def setup_logging(self):
-        """Configure logging to config/inventory_sk.log."""
-        log_file = self.config_dir / "inventory_sk.log"
+        """Configure logging to config/inventory.log."""
+        log_file = self.config_dir / "inventory.log"
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
@@ -928,28 +988,35 @@ class InventurAppSK:
             ],
         )
         self.logger = logging.getLogger(__name__)
-        self.logger.info(f"Inventory SK application started (mode: {getattr(self, 'warehouse_mode', 'unknown')})")
+        self.logger.info(
+            f"Inventory application v{APP_VERSION} started "
+            f"(mode: {getattr(self, 'warehouse_mode', 'unknown')})")
 
     # ------------------------------------------------------------------
     # Config
     # ------------------------------------------------------------------
 
     def load_config(self):
-        """Load config from config/settings_sk.json."""
-        config_path = self.config_dir / "settings_sk.json"
+        """Load config from config/settings.json."""
+        config_path = self.config_dir / "settings.json"
         default_config = {
             "auto_save": True,
-            "arbeitstabelle_path": "",
-            "export_path": "",
             "vollbild": True,
-            "arbeitstabelle_zert_path": "",
-            "export_zert_path": "",
-            "arbeitstabelle_kmat_path": "",
-            "export_kmat_path": "",
-            "arbeitstabelle_wip_path": "",
-            "export_wip_path": "",
             "show_switch_warehouse": False,
         }
+        for master_key, export_key in MODE_CONFIG_KEYS.values():
+            default_config[master_key] = ""
+            default_config[export_key] = ""
+
+        # Migrate settings from the former file name (settings_sk.json)
+        legacy_path = self.config_dir / "settings_sk.json"
+        if not config_path.exists() and legacy_path.exists():
+            try:
+                shutil.copy2(legacy_path, config_path)
+                self.logger.info(f"Settings migrated from {legacy_path.name} to {config_path.name}")
+            except Exception as e:
+                self.logger.error(f"Error migrating settings: {e}")
+
         try:
             if config_path.exists():
                 with open(config_path, "r", encoding="utf-8-sig") as f:
@@ -965,9 +1032,9 @@ class InventurAppSK:
             self.logger.error(f"Error loading config: {e}")
 
     def save_config(self):
-        """Save config to config/settings_sk.json."""
+        """Save config to config/settings.json."""
         try:
-            config_path = self.config_dir / "settings_sk.json"
+            config_path = self.config_dir / "settings.json"
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
         except Exception as e:
@@ -980,8 +1047,8 @@ class InventurAppSK:
     def init_data(self):
         """Initialise data structures."""
         self.df_rollen = None
-        self.inventur_data = []       # found rolls (SK)
-        self.not_found_data = []      # not-found rolls (SK)
+        self.inventur_data = []       # found rolls (HALB)
+        self.not_found_data = []      # not-found rolls (HALB)
         self.current_scan = None
         self.current_qr_data = None
         self.undo_stack = []
@@ -1000,6 +1067,11 @@ class InventurAppSK:
         self.inventur_data_wip = []
         self.not_found_data_wip = []
         self.df_wip = None
+
+        # Granules data
+        self.df_granules = None
+        self.inventur_data_granules = []
+        self.not_found_data_granules = []
 
     # ------------------------------------------------------------------
     # QR parsing
@@ -1047,11 +1119,11 @@ class InventurAppSK:
             }
 
     # ------------------------------------------------------------------
-    # Master table (SK)
+    # Master table (HALB)
     # ------------------------------------------------------------------
 
     def load_arbeitstabelle(self):
-        """Load SK master table from the configured path (single sheet)."""
+        """Load HALB-type master table from the configured path (single sheet)."""
         if self.arbeitstabelle_path is None or not self.arbeitstabelle_path.exists():
             self.df_rollen = None
             self.logger.warning("Master table not loaded (path not set or file missing)")
@@ -1161,7 +1233,37 @@ class InventurAppSK:
             self.df_wip = None
 
     # ------------------------------------------------------------------
-    # Charge lookup (SK)
+    # Master table (Granules)
+    # ------------------------------------------------------------------
+
+    def load_arbeitstabelle_granules(self):
+        """Load Granules master table (German or English headers, see GRANULES_COLUMN_MAP)."""
+        if self.arbeitstabelle_granules_path is None or not self.arbeitstabelle_granules_path.exists():
+            self.df_granules = None
+            self.logger.warning("Granules master table not loaded")
+            return
+        try:
+            df = pd.read_excel(self.arbeitstabelle_granules_path, sheet_name=0, dtype=str)
+            df.columns = [str(c).strip() for c in df.columns]
+            df = df.rename(columns={c: GRANULES_COLUMN_MAP[c] for c in df.columns if c in GRANULES_COLUMN_MAP})
+
+            if "Batch" not in df.columns:
+                raise ValueError(
+                    "Granules master table is missing the batch column ('Charge' or 'Batch').")
+
+            df["_batch_key"] = df["Batch"].apply(_batch_key)
+            self.df_granules = df
+
+            count = len(self.df_granules)
+            self.logger.info(f"Granules master table loaded: {count} rows")
+            self.status_var.set(f"Granules master table loaded: {count} entries")
+            self._update_header_info()
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading Granules master table:\n{e}")
+            self.df_granules = None
+
+    # ------------------------------------------------------------------
+    # Charge lookup (HALB)
     # ------------------------------------------------------------------
 
     def suche_charge(self, charge):
@@ -1206,6 +1308,18 @@ class InventurAppSK:
             return None
         order_norm = _norm_num_lookup(order)
         matches = self.df_wip[self.df_wip["Order"] == order_norm]
+        if not matches.empty:
+            return matches.iloc[0].to_dict()
+        return None
+
+    def suche_granules(self, charge):
+        """Look up a batch in df_granules (leading zeros ignored). Returns row dict or None."""
+        if self.df_granules is None:
+            return None
+        key = _batch_key(charge)
+        if not key:
+            return None
+        matches = self.df_granules[self.df_granules["_batch_key"] == key]
         if not matches.empty:
             return matches.iloc[0].to_dict()
         return None
@@ -1312,7 +1426,39 @@ class InventurAppSK:
                 self.config["export_wip_path"] = str(self.base_dir)
                 self.save_config()
                 self._resolve_paths()
+        elif self.warehouse_mode == "Granules":
+            arb_missing = (
+                self.arbeitstabelle_granules_path is None
+                or not self.arbeitstabelle_granules_path.exists()
+            )
+            if arb_missing:
+                answer = messagebox.askyesno(
+                    "Granules Master Table Not Found",
+                    "The Granules master table has not been configured or could not be found.\n\nSearch now?",
+                )
+                if answer:
+                    path = filedialog.askopenfilename(
+                        title="Select Granules Master Table",
+                        filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                    )
+                    if path:
+                        self.config["arbeitstabelle_granules_path"] = path
+                        self.save_config()
+                        self._resolve_paths()
+                        self.load_arbeitstabelle_granules()
+                    else:
+                        self._disable_scan("No Granules master table selected. Scanning disabled.")
+                else:
+                    self._disable_scan("Granules master table not configured. Scanning disabled.")
+            else:
+                self.load_arbeitstabelle_granules()
+
+            if not self.config.get("export_granules_path", ""):
+                self.config["export_granules_path"] = str(self.base_dir)
+                self.save_config()
+                self._resolve_paths()
         else:
+            mode_label = MODES[self.halb_mode][0]
             arb_missing = (
                 self.arbeitstabelle_path is None
                 or not self.arbeitstabelle_path.exists()
@@ -1320,17 +1466,17 @@ class InventurAppSK:
 
             if arb_missing:
                 answer = messagebox.askyesno(
-                    "Master Table Not Found",
-                    "The master table file has not been configured or could not be found.\n\n"
+                    f"{mode_label} Master Table Not Found",
+                    f"The {mode_label} master table file has not been configured or could not be found.\n\n"
                     "Would you like to locate it now?",
                 )
                 if answer:
                     path = filedialog.askopenfilename(
-                        title="Select Master Table file",
+                        title=f"Select {mode_label} Master Table file",
                         filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
                     )
                     if path:
-                        self.config["arbeitstabelle_path"] = path
+                        self.config[self.master_key] = path
                         self.save_config()
                         self._resolve_paths()
                         self.load_arbeitstabelle()
@@ -1342,8 +1488,8 @@ class InventurAppSK:
                 self.load_arbeitstabelle()
 
             # Default export path to base_dir if not set
-            if not self.config.get("export_path", ""):
-                self.config["export_path"] = str(self.base_dir)
+            if not self.config.get(self.export_key, ""):
+                self.config[self.export_key] = str(self.base_dir)
                 self.save_config()
                 self._resolve_paths()
 
@@ -1358,7 +1504,7 @@ class InventurAppSK:
 
     def open_settings_dialog(self):
         """Open the settings dialog and apply any changes."""
-        dlg = SettingsDialog(self.root, self.config)
+        dlg = SettingsDialog(self.root, self.config, self.warehouse_mode)
         if dlg.result:
             self.config.update(dlg.result)
             self.save_config()
@@ -1375,6 +1521,9 @@ class InventurAppSK:
             elif self.warehouse_mode == "WIP":
                 self.load_arbeitstabelle_wip()
                 messagebox.showinfo("Settings Saved", "Settings have been saved.\nWIP master table reloaded.")
+            elif self.warehouse_mode == "Granules":
+                self.load_arbeitstabelle_granules()
+                messagebox.showinfo("Settings Saved", "Settings have been saved.\nGranules master table reloaded.")
             else:
                 self.load_arbeitstabelle()
                 messagebox.showinfo("Settings Saved", "Settings have been saved.\nMaster table reloaded.")
@@ -1400,14 +1549,7 @@ class InventurAppSK:
         style = ttk.Style()
         style.configure("BigScan.TButton", font=("Arial", 20))
         style.configure("BigSave.TButton", font=("Arial", 20))
-        if self.warehouse_mode == "Zert":
-            self.root.title("INVENTORY Forbo - ZERT Warehouse")
-        elif self.warehouse_mode == "KMAT":
-            self.root.title("INVENTORY Forbo - KMAT Warehouse")
-        elif self.warehouse_mode == "WIP":
-            self.root.title("INVENTORY Forbo - WIP Warehouse")
-        else:
-            self.root.title("INVENTORY Forbo - HALB Warehouse")
+        self.root.title(f"INVENTORY Forbo - {MODES[self.warehouse_mode][0]}  (v{APP_VERSION})")
         self.root.geometry("1280x820")
         self.root.configure(bg="#f0f0f0")
 
@@ -1442,18 +1584,8 @@ class InventurAppSK:
         header_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 16))
         header_frame.columnconfigure(1, weight=1)
 
-        if self.warehouse_mode == "Zert":
-            fg_color = "#375623"
-            header_text = "INVENTORY Forbo - ZERT Warehouse"
-        elif self.warehouse_mode == "KMAT":
-            fg_color = "#6b1f1f"
-            header_text = "INVENTORY Forbo - KMAT Warehouse"
-        elif self.warehouse_mode == "WIP":
-            fg_color = "#4a3728"
-            header_text = "INVENTORY Forbo - WIP Warehouse"
-        else:
-            fg_color = "#1f4e79"
-            header_text = "INVENTORY Forbo - HALB Warehouse"
+        mode_label, fg_color = MODES[self.warehouse_mode]
+        header_text = f"INVENTORY Forbo - {mode_label}"
 
         ttk.Label(header_frame, text="[F]", font=("Arial", 20, "bold"),
                   foreground=fg_color).grid(row=0, column=0, padx=(0, 16))
@@ -1468,6 +1600,9 @@ class InventurAppSK:
         self.header_info_var = tk.StringVar(value="No master table loaded")
         ttk.Label(header_frame, textvariable=self.header_info_var,
                   font=("Arial", 10)).grid(row=0, column=2, padx=(20, 0))
+
+        ttk.Label(header_frame, text=f"v{APP_VERSION}", font=("Arial", 10),
+                  foreground="gray").grid(row=0, column=3, padx=(20, 0))
 
     def _update_header_info(self):
         if self.warehouse_mode == "Zert":
@@ -1485,6 +1620,11 @@ class InventurAppSK:
                 self.header_info_var.set(f"DB: {len(self.df_wip)} entries in WIP master table")
             else:
                 self.header_info_var.set("No WIP master table loaded")
+        elif self.warehouse_mode == "Granules":
+            if self.df_granules is not None:
+                self.header_info_var.set(f"DB: {len(self.df_granules)} batches in Granules master table")
+            else:
+                self.header_info_var.set("No Granules master table loaded")
         else:
             if self.df_rollen is not None:
                 self.header_info_var.set(f"DB: {len(self.df_rollen)} rolls in master table")
@@ -1531,11 +1671,12 @@ class InventurAppSK:
         self._create_kmat_input_panel()
         self._create_wip_info_panel()
         self._create_wip_input_panel()
+        self._create_granules_panel()
 
         self.current_frame.grid_remove()
 
     def _create_display_labels(self):
-        """Create read-only display labels for SK scan data."""
+        """Create read-only display labels for HALB scan data."""
         # Row 0: Batch No. | Material
         ttk.Label(self.current_frame, text="Batch No.:", font=("Arial", 11, "bold")).grid(
             row=0, column=0, sticky=tk.W, pady=2)
@@ -1628,11 +1769,11 @@ class InventurAppSK:
         self.lbl_brte2 = ttk.Label(self.dim_frame, text="", font=("Arial", 10, "bold"), width=8)
         self.lbl_brte2.grid(row=2, column=5, sticky=tk.W)
 
-        self.sk_separator = ttk.Separator(self.current_frame, orient="horizontal")
-        self.sk_separator.grid(row=6, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=8)
+        self.halb_separator = ttk.Separator(self.current_frame, orient="horizontal")
+        self.halb_separator.grid(row=6, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=8)
 
     def _create_input_panel(self):
-        """Create user input widgets for SK (Fach + Measured Width + Remarks)."""
+        """Create user input widgets for HALB (Fach + Measured Width + Remarks)."""
         self.fach_var = tk.StringVar()
         self.brte_meas_var = tk.StringVar()
         self.remarks_var = tk.StringVar()
@@ -1682,7 +1823,7 @@ class InventurAppSK:
     def _create_zert_info_panel(self):
         """Create info display panel for Zert mode (initially hidden)."""
         self.zert_info_container = ttk.LabelFrame(
-            self.current_frame, text="Zert Charge Info", padding="8")
+            self.current_frame, text="Zert Batch Info", padding="8")
         # Don't grid yet — shown on demand
 
         self.zert_info_container.columnconfigure(1, weight=1)
@@ -1690,7 +1831,7 @@ class InventurAppSK:
 
         # Labels for Zert info fields
         fields_left = [
-            ("Charge:", "zert_lbl_charge"),
+            ("Batch No.:", "zert_lbl_charge"),
             ("Material No.:", "zert_lbl_material"),
             ("Description:", "zert_lbl_kurztext"),
             ("Mat. Type:", "zert_lbl_mart"),
@@ -1889,14 +2030,68 @@ class InventurAppSK:
 
         menge_e.bind("<Return>", self.save_current_scan_wip)
 
-    def _show_sk_widgets(self):
-        """Show SK-specific widgets, hide Zert and KMAT widgets."""
-        # Show SK rows 0-7
+    def _create_granules_panel(self):
+        """Create info + input panel for Granules mode (initially hidden).
+        Batch, Material No., Description, Quantity — line — Counted Qty (KG), Remarks."""
+        self.granules_container = ttk.Frame(self.current_frame)
+        self.granules_container.columnconfigure(1, weight=1)
+
+        info_fields = [
+            ("Batch No.:", "gran_lbl_charge"),
+            ("Material No.:", "gran_lbl_material"),
+            ("Description:", "gran_lbl_kurztext"),
+            ("Quantity:", "gran_lbl_frei"),
+        ]
+        for r, (lbl_text, attr) in enumerate(info_fields):
+            ttk.Label(self.granules_container, text=lbl_text,
+                      font=("Arial", 18)).grid(row=r, column=0, sticky=tk.W, pady=3)
+            lbl = ttk.Label(self.granules_container, text="", font=("Arial", 20, "bold"))
+            lbl.grid(row=r, column=1, sticky=tk.W, padx=(10, 0), pady=3)
+            setattr(self, attr, lbl)
+
+        ttk.Separator(self.granules_container, orient="horizontal").grid(
+            row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+
+        self.gran_menge_var = tk.StringVar()
+        self.gran_remarks_var = tk.StringVar()
+        self.gran_input_widgets = {}
+
+        ttk.Label(self.granules_container, text="Counted Qty (KG) *:",
+                  font=("Arial", 22, "bold")).grid(row=5, column=0, sticky=tk.W, pady=5)
+        entry_menge = ttk.Entry(self.granules_container, textvariable=self.gran_menge_var,
+                                font=("Arial", 24), width=15)
+        entry_menge.grid(row=5, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_menge.bind("<Return>", self.save_current_scan_granules)
+        self.gran_input_widgets["menge_entry"] = entry_menge
+
+        ttk.Label(self.granules_container, text="Remarks (optional):",
+                  font=("Arial", 22, "bold")).grid(row=6, column=0, sticky=tk.W, pady=5)
+        entry_remarks = ttk.Entry(self.granules_container, textvariable=self.gran_remarks_var,
+                                  font=("Arial", 24), width=40)
+        entry_remarks.grid(row=6, column=1, sticky=tk.W, padx=(10, 0), pady=5)
+        entry_remarks.bind("<Return>", self.save_current_scan_granules)
+        self.gran_input_widgets["remarks_entry"] = entry_remarks
+
+        save_btn = ttk.Button(self.granules_container, text="Save",
+                              command=self.save_current_scan_granules, style="BigSave.TButton")
+        save_btn.grid(row=7, column=1, sticky=tk.W, padx=(10, 0), pady=8)
+        self.gran_input_widgets["save_button"] = save_btn
+
+    def _show_granules_widgets(self):
+        """Show Granules panel, hide all other mode widgets."""
+        for widget in self.current_frame.grid_slaves():
+            widget.grid_remove()
+        self.granules_container.grid(row=0, column=0, columnspan=4,
+                                     sticky=(tk.W, tk.E), pady=4)
+
+    def _show_halb_widgets(self):
+        """Show HALB-specific widgets, hide all other mode widgets."""
+        # Show HALB rows 0-7
         for r in range(8):
             for widget in self.current_frame.grid_slaves(row=r):
                 widget.grid()
         self.dim_frame.grid()
-        self.sk_separator.grid()
+        self.halb_separator.grid()
         self.input_container.grid()
         # Hide Zert containers
         self.zert_info_container.grid_remove()
@@ -1904,10 +2099,14 @@ class InventurAppSK:
         # Hide KMAT containers
         self.kmat_info_container.grid_remove()
         self.kmat_input_container.grid_remove()
+        # Hide WIP / Granules containers
+        self.wip_info_container.grid_remove()
+        self.wip_input_container.grid_remove()
+        self.granules_container.grid_remove()
 
     def _show_zert_widgets(self):
-        """Show Zert-specific widgets, hide SK and KMAT widgets."""
-        # Hide all SK-specific widgets (rows 0-7 labels + dim_frame + separator + input_container)
+        """Show Zert-specific widgets, hide all other mode widgets."""
+        # Hide all HALB-specific widgets (rows 0-7 labels + dim_frame + separator + input_container)
         for widget in self.current_frame.grid_slaves():
             widget.grid_remove()
 
@@ -1918,7 +2117,7 @@ class InventurAppSK:
                                         sticky=(tk.W, tk.E), pady=4)
 
     def _show_kmat_widgets(self):
-        """Show KMAT-specific widgets, hide SK and Zert widgets."""
+        """Show KMAT-specific widgets, hide all other mode widgets."""
         for widget in self.current_frame.grid_slaves():
             widget.grid_remove()
         self.kmat_info_container.grid(row=0, column=0, columnspan=4,
@@ -1927,7 +2126,7 @@ class InventurAppSK:
                                         sticky=(tk.W, tk.E), pady=4)
 
     def _show_wip_widgets(self):
-        """Show WIP-specific widgets, hide SK and Zert and KMAT widgets."""
+        """Show WIP-specific widgets, hide all other mode widgets."""
         for widget in self.current_frame.grid_slaves():
             widget.grid_remove()
         self.wip_info_container.grid(row=0, column=0, columnspan=4,
@@ -1943,6 +2142,7 @@ class InventurAppSK:
         self.kmat_input_container.grid_remove()
         self.wip_info_container.grid_remove()
         self.wip_input_container.grid_remove()
+        self.granules_container.grid_remove()
         self.input_container.grid_remove()
 
     # --- List section ---
@@ -1961,11 +2161,13 @@ class InventurAppSK:
         self.count_label.pack(side=tk.LEFT)
 
         if self.warehouse_mode == "Zert":
-            columns = ("Time", "Charge", "Material No.", "Description", "Quantity", "UOM", "Status")
+            columns = ("Time", "Batch No.", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "KMAT":
             columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM", "Status")
         elif self.warehouse_mode == "WIP":
             columns = ("Time", "Sales Order", "Order", "Material No.", "Description", "Quantity", "UOM", "Status")
+        elif self.warehouse_mode == "Granules":
+            columns = ("Time", "Batch No.", "Material No.", "Description", "Counted (KG)", "Free Usable", "Status")
         else:
             columns = ("Time", "Batch No.", "Material", "Shelf Location", "Status")
 
@@ -1976,7 +2178,7 @@ class InventurAppSK:
 
         if self.warehouse_mode == "Zert":
             self.tree.column("Time", width=90, minwidth=70)
-            self.tree.column("Charge", width=130, minwidth=100)
+            self.tree.column("Batch No.", width=130, minwidth=100)
             self.tree.column("Material No.", width=110, minwidth=80)
             self.tree.column("Description", width=200, minwidth=120)
             self.tree.column("Quantity", width=80, minwidth=60)
@@ -2000,6 +2202,14 @@ class InventurAppSK:
             self.tree.column("Quantity", width=80, minwidth=60)
             self.tree.column("UOM", width=60, minwidth=50)
             self.tree.column("Status", width=80, minwidth=60)
+        elif self.warehouse_mode == "Granules":
+            self.tree.column("Time", width=90, minwidth=70)
+            self.tree.column("Batch No.", width=130, minwidth=100)
+            self.tree.column("Material No.", width=110, minwidth=80)
+            self.tree.column("Description", width=240, minwidth=120)
+            self.tree.column("Counted (KG)", width=100, minwidth=70)
+            self.tree.column("Free Usable", width=100, minwidth=70)
+            self.tree.column("Status", width=100, minwidth=80)
         else:
             self.tree.column("Time", width=90, minwidth=70)
             self.tree.column("Batch No.", width=130, minwidth=100)
@@ -2125,6 +2335,12 @@ class InventurAppSK:
                 self.show_found_wip(row_data, order)
             else:
                 self.show_not_found_dialog_wip(order)
+        elif self.warehouse_mode == "Granules":
+            row_data = self.suche_granules(charge)
+            if row_data is not None:
+                self.show_found_granules(row_data, charge)
+            else:
+                self.show_not_found_dialog_granules(charge)
         else:
             row_data = self.suche_charge(charge)
             if row_data is not None:
@@ -2136,6 +2352,12 @@ class InventurAppSK:
         if self.warehouse_mode == "Zert":
             for item in self.inventur_data_zert + self.not_found_data_zert:
                 if str(item.get("charge", "")) == str(charge):
+                    return True
+            return False
+        elif self.warehouse_mode == "Granules":
+            key = _batch_key(charge)
+            for item in self.inventur_data_granules + self.not_found_data_granules:
+                if _batch_key(item.get("charge", "")) == key:
                     return True
             return False
         else:
@@ -2152,11 +2374,11 @@ class InventurAppSK:
         return False
 
     # ------------------------------------------------------------------
-    # Show found roll (SK)
+    # Show found roll (HALB)
     # ------------------------------------------------------------------
 
     def show_found_rolle(self, row_data, qr):
-        """Display found roll data and show the input panel (SK mode)."""
+        """Display found roll data and show the input panel (HALB mode)."""
         def _fmt_int(val):
             """Format numeric value as integer string (remove .0)."""
             if val == "" or val is None:
@@ -2222,7 +2444,7 @@ class InventurAppSK:
 
         self.current_frame.config(text="ROLL FOUND")
         self.current_frame.grid()
-        self._show_sk_widgets()
+        self._show_halb_widgets()
 
         # Reset input fields
         self.fach_var.set("")
@@ -2276,7 +2498,7 @@ class InventurAppSK:
         # Show BME hint next to menge entry
         self.zert_lbl_bme_input.config(text=self.current_scan["bme"])
 
-        self.current_frame.config(text="CHARGE FOUND (Zert)")
+        self.current_frame.config(text="BATCH FOUND (Zert)")
         self.current_frame.grid()
         self._show_zert_widgets()
 
@@ -2287,7 +2509,7 @@ class InventurAppSK:
 
         self.scan_var.set("")
         self.status_var.set(
-            f"Charge found: {self.current_scan['kurztext']} | Enter quantity")
+            f"Batch found: {self.current_scan['kurztext']} | Enter quantity")
 
     # ------------------------------------------------------------------
     # Show found KMAT item
@@ -2377,12 +2599,12 @@ class InventurAppSK:
         self.status_var.set(f"WIP found: {self.current_scan['kurztext']} | Enter quantity")
 
     # ------------------------------------------------------------------
-    # Not found dialog (SK)
+    # Not found dialog (HALB)
     # ------------------------------------------------------------------
 
     def show_not_found_dialog(self, charge, qr):
-        """Show dialog for rolls not in master table (SK)."""
-        dlg = NotFoundDialogSK(self.root, charge, qr)
+        """Show dialog for rolls not in master table (HALB)."""
+        dlg = NotFoundDialogHALB(self.root, charge, qr)
 
         if dlg.result:
             data = dlg.result.copy()
@@ -2395,7 +2617,7 @@ class InventurAppSK:
                 self.undo_stack.pop(0)
 
             if self.config.get("auto_save", True):
-                self.save_cz_excel()
+                self.save_halb_excel()
 
             self.update_list()
             total = len(self.inventur_data) + len(self.not_found_data)
@@ -2433,10 +2655,10 @@ class InventurAppSK:
             self.update_list()
             total = len(self.inventur_data_zert) + len(self.not_found_data_zert)
             self.status_var.set(
-                f"Not-found charge saved. Total: {total} "
+                f"Not-found batch saved. Total: {total} "
                 f"({len(self.inventur_data_zert)} found, {len(self.not_found_data_zert)} not found)"
             )
-            self.logger.info(f"Not-found Zert charge saved: {data['charge']}")
+            self.logger.info(f"Not-found Zert batch saved: {data['charge']}")
         else:
             self.logger.info("Zert not-found dialog cancelled")
 
@@ -2509,11 +2731,11 @@ class InventurAppSK:
         self._reset_scan()
 
     # ------------------------------------------------------------------
-    # Save current scan (SK)
+    # Save current scan (HALB)
     # ------------------------------------------------------------------
 
     def save_current_scan(self, event=None):
-        """Validate and save the current found roll (SK)."""
+        """Validate and save the current found roll (HALB)."""
         if not self.current_scan:
             return
 
@@ -2547,7 +2769,7 @@ class InventurAppSK:
             self.undo_stack.pop(0)
 
         if self.config.get("auto_save", True):
-            self.save_cz_excel()
+            self.save_halb_excel()
 
         self.update_list()
 
@@ -2606,10 +2828,10 @@ class InventurAppSK:
 
         total = len(self.inventur_data_zert) + len(self.not_found_data_zert)
         self.status_var.set(
-            f"Charge saved. Total: {total} "
+            f"Batch saved. Total: {total} "
             f"({len(self.inventur_data_zert)} found, {len(self.not_found_data_zert)} not found)"
         )
-        self.logger.info(f"Zert charge saved: {self.current_scan['charge']}")
+        self.logger.info(f"Zert batch saved: {self.current_scan['charge']}")
 
         self._reset_scan()
 
@@ -2694,6 +2916,115 @@ class InventurAppSK:
         self._reset_scan()
 
     # ------------------------------------------------------------------
+    # Granules: show found / not found / save
+    # ------------------------------------------------------------------
+
+    def show_found_granules(self, row_data, charge):
+        """Display found Granules batch and show the Granules panel."""
+        def _s(val):
+            if val is None:
+                return ""
+            s = str(val)
+            return "" if s.lower() == "nan" else s
+
+        self.current_scan = {
+            # Keep the batch as written in the master table (with leading zeros)
+            "charge": _s(row_data.get("Batch", "")) or charge,
+            "material": _s(row_data.get("Material Number", "")),
+            "kurztext": _s(row_data.get("Material Description", "")),
+            "werk": _s(row_data.get("Plant", "")),
+            "lort": _s(row_data.get("Storage Location", "")),
+            "bme": _s(row_data.get("Base Unit of Measure", "")) or "KG",
+            "frei_verw": _fmt_qty(_s(row_data.get("Unrestricted", ""))),
+            "status": "found",
+            "_mode": "granules",
+        }
+
+        self.gran_lbl_charge.config(text=self.current_scan["charge"])
+        self.gran_lbl_material.config(text=self.current_scan["material"])
+        self.gran_lbl_kurztext.config(text=self.current_scan["kurztext"])
+        self.gran_lbl_frei.config(
+            text=f"{self.current_scan['frei_verw']} {self.current_scan['bme']}".strip())
+
+        self.current_frame.config(text="BATCH FOUND (Granules)")
+        self.current_frame.grid()
+        self._show_granules_widgets()
+
+        self.gran_menge_var.set("")
+        self.gran_remarks_var.set("")
+        self.gran_input_widgets["menge_entry"].focus_set()
+
+        self.scan_var.set("")
+        self.status_var.set(f"Batch found: {self.current_scan['kurztext']} | Enter counted quantity (KG)")
+
+    def show_not_found_dialog_granules(self, charge):
+        """Show dialog for Granules batches not in master table."""
+        dlg = NotFoundDialogGranules(self.root, charge)
+
+        if dlg.result:
+            data = dlg.result.copy()
+            data["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+            self.not_found_data_granules.append(data)
+
+            self.undo_stack.append(("add_not_found_granules", data.copy()))
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+
+            if self.config.get("auto_save", True):
+                self.save_granules_excel()
+
+            self.update_list()
+            total = len(self.inventur_data_granules) + len(self.not_found_data_granules)
+            self.status_var.set(
+                f"Not-found batch saved. Total: {total} "
+                f"({len(self.inventur_data_granules)} found, {len(self.not_found_data_granules)} not found)"
+            )
+            self.logger.info(f"Not-found Granules batch saved: {data['charge']}")
+        else:
+            self.logger.info("Granules not-found dialog cancelled")
+
+        self._reset_scan()
+
+    def save_current_scan_granules(self, event=None):
+        """Validate and save the current found Granules batch."""
+        if not self.current_scan or self.current_scan.get("_mode") != "granules":
+            return
+
+        menge = self.gran_menge_var.get().strip()
+        if not menge:
+            messagebox.showwarning("Required Field", "Counted Qty (KG) is mandatory.")
+            self.gran_input_widgets["menge_entry"].focus_set()
+            return
+        if _to_float(menge) is None:
+            messagebox.showwarning("Invalid Input", "Counted Qty (KG) must be a number.")
+            self.gran_input_widgets["menge_entry"].focus_set()
+            return
+
+        self.current_scan["menge"] = menge
+        self.current_scan["remarks"] = self.gran_remarks_var.get().strip()
+        self.current_scan["zeitstempel"] = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+        self.inventur_data_granules.append(self.current_scan.copy())
+
+        self.undo_stack.append(("add_found_granules", self.current_scan.copy()))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+
+        if self.config.get("auto_save", True):
+            self.save_granules_excel()
+
+        self.update_list()
+        total = len(self.inventur_data_granules) + len(self.not_found_data_granules)
+        self.status_var.set(
+            f"Batch saved. Total: {total} "
+            f"({len(self.inventur_data_granules)} found, {len(self.not_found_data_granules)} not found)"
+        )
+        self.logger.info(f"Granules batch saved: {self.current_scan['charge']}")
+
+        self._reset_scan()
+
+    # ------------------------------------------------------------------
     # Reset scan
     # ------------------------------------------------------------------
 
@@ -2716,6 +3047,10 @@ class InventurAppSK:
             self.wip_menge_var.set("")
         if hasattr(self, "wip_remarks_var"):
             self.wip_remarks_var.set("")
+        if hasattr(self, "gran_menge_var"):
+            self.gran_menge_var.set("")
+        if hasattr(self, "gran_remarks_var"):
+            self.gran_remarks_var.set("")
         self.current_frame.grid_remove()
         self.scan_entry.focus_set()
         self.status_var.set("Ready to scan...")
@@ -2835,6 +3170,36 @@ class InventurAppSK:
                 text=f"{total} entries ({len(self.inventur_data_wip)} found, "
                      f"{len(self.not_found_data_wip)} not found)"
             )
+        elif self.warehouse_mode == "Granules":
+            all_items = []
+            for d in self.inventur_data_granules:
+                all_items.append((d, "Found"))
+            for d in self.not_found_data_granules:
+                all_items.append((d, "NOT FOUND"))
+
+            all_items.sort(key=lambda x: self._parse_ts(x[0].get("zeitstempel", "")), reverse=True)
+
+            for d, status in all_items:
+                ts = d.get("zeitstempel", "")
+                time_part = ts.split(" ")[1] if " " in ts else ts
+                self.tree.insert(
+                    "", "end",
+                    values=(
+                        time_part,
+                        d.get("charge", ""),
+                        d.get("material", ""),
+                        d.get("kurztext", ""),
+                        d.get("menge", ""),
+                        d.get("frei_verw", ""),
+                        status,
+                    ),
+                )
+
+            total = len(self.inventur_data_granules) + len(self.not_found_data_granules)
+            self.count_label.config(
+                text=f"{total} batches ({len(self.inventur_data_granules)} found, "
+                     f"{len(self.not_found_data_granules)} not found)"
+            )
         else:
             all_items = []
             for d in self.inventur_data:
@@ -2869,7 +3234,7 @@ class InventurAppSK:
             )
 
     # ------------------------------------------------------------------
-    # Excel save (SK)
+    # Excel save (HALB)
     # ------------------------------------------------------------------
 
     INVENTORY_HEADERS = [
@@ -2929,8 +3294,8 @@ class InventurAppSK:
         for r in range(2, data_count + 2):
             ws[f"{charge_col}{r}"].number_format = "@"
 
-    def save_cz_excel(self):
-        """Write Inventory_HALB.xlsx with Inventory and Not_Found sheets."""
+    def save_halb_excel(self):
+        """Write Inventory_<mode>.xlsx (HALB-type modes) with Inventory and Not_Found sheets."""
         try:
             wb = Workbook()
             if "Sheet" in wb.sheetnames:
@@ -2970,7 +3335,7 @@ class InventurAppSK:
         "Mat. Type",
         "Plant",
         "Location",
-        "Charge",
+        "Batch No.",
         "UOM",
         "Free Usable",
         "Length (mm)",
@@ -3154,11 +3519,91 @@ class InventurAppSK:
             self.logger.error(f"Error saving WIP Excel: {e}")
 
     # ------------------------------------------------------------------
-    # Load existing session (SK)
+    # Excel save (Granules)
     # ------------------------------------------------------------------
 
-    def load_existing_cz(self):
-        """Resume a previous session by loading Inventory_HALB.xlsx."""
+    GRANULES_HEADERS = [
+        "Timestamp",
+        "Plant",
+        "Location",
+        "Material No.",
+        "Description",
+        "Batch No.",
+        "Free Usable",
+        "UOM",
+        "Counted Qty (KG)",
+        "Difference (KG)",   # Counted Qty - Free Usable
+        "Remarks",
+    ]
+
+    def _row_from_granules_item(self, d):
+        def _clean(v):
+            if v is None:
+                return ""
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        def _num(v):
+            f = _to_float(v)
+            if f is None:
+                return _clean(v)
+            return int(f) if f.is_integer() else f
+
+        counted = _to_float(d.get("menge", ""))
+        free = _to_float(d.get("frei_verw", ""))
+        diff = _num(round(counted - free, 3)) if counted is not None and free is not None else ""
+
+        return [
+            _clean(d.get("zeitstempel", "")),
+            _clean(d.get("werk", "")),
+            _clean(d.get("lort", "")),
+            _clean(d.get("material", "")),
+            _clean(d.get("kurztext", "")),
+            _clean(d.get("charge", "")),
+            _num(d.get("frei_verw", "")),
+            _clean(d.get("bme", "")),
+            _num(d.get("menge", "")),
+            diff,
+            _clean(d.get("remarks", "")),
+        ]
+
+    def save_granules_excel(self):
+        """Write Inventory_Granules.xlsx with Inventory and Not_Found sheets."""
+        try:
+            wb = Workbook()
+            if "Sheet" in wb.sheetnames:
+                wb.remove(wb["Sheet"])
+
+            ws_inv = wb.create_sheet("Inventory")
+            ws_inv.append(self.GRANULES_HEADERS)
+            for d in self.inventur_data_granules:
+                ws_inv.append(self._row_from_granules_item(d))
+
+            ws_nf = wb.create_sheet("Not_Found")
+            ws_nf.append(self.GRANULES_HEADERS)
+            for d in self.not_found_data_granules:
+                ws_nf.append(self._row_from_granules_item(d))
+
+            # Batch No. (col F) as text so leading zeros are kept
+            for ws, count in ((ws_inv, len(self.inventur_data_granules)),
+                              (ws_nf, len(self.not_found_data_granules))):
+                for r in range(2, count + 2):
+                    ws[f"F{r}"].number_format = "@"
+
+            self.export_granules_path.mkdir(parents=True, exist_ok=True)
+            wb.save(self.inventur_granules_path)
+            self.logger.info(f"Granules Excel saved: {self.inventur_granules_path}")
+
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Error saving Granules Excel file:\n{e}")
+            self.logger.error(f"Error saving Granules Excel: {e}")
+
+    # ------------------------------------------------------------------
+    # Load existing session (HALB)
+    # ------------------------------------------------------------------
+
+    def load_existing_halb(self):
+        """Resume a previous session by loading Inventory_<mode>.xlsx (HALB-type modes)."""
         if not self.inventur_path.exists():
             return
 
@@ -3236,7 +3681,7 @@ class InventurAppSK:
         loaded = 0
         try:
             df_inv = pd.read_excel(
-                self.inventur_zert_path, sheet_name="Inventory", dtype={"Charge": str})
+                self.inventur_zert_path, sheet_name="Inventory", dtype={"Batch No.": str, "Charge": str})
             for _, row in df_inv.iterrows():
                 self.inventur_data_zert.append(self._row_to_zert_dict(row, status="found"))
                 loaded += 1
@@ -3245,7 +3690,7 @@ class InventurAppSK:
 
         try:
             df_nf = pd.read_excel(
-                self.inventur_zert_path, sheet_name="Not_Found", dtype={"Charge": str})
+                self.inventur_zert_path, sheet_name="Not_Found", dtype={"Batch No.": str, "Charge": str})
             for _, row in df_nf.iterrows():
                 self.not_found_data_zert.append(self._row_to_zert_dict(row, status="not_found"))
                 loaded += 1
@@ -3277,7 +3722,7 @@ class InventurAppSK:
             "mart": _str(row.get("Mat. Type", "")),
             "werk": _str(row.get("Plant", "")),
             "lort": _str(row.get("Location", "")),
-            "charge": _str(row.get("Charge", "")),
+            "charge": _str(row.get("Batch No.", row.get("Charge", ""))),
             "bme": _str(row.get("UOM", "")),
             "frei_verw": _str(row.get("Free Usable", "")),
             "laenge_mm": _str(row.get("Length (mm)", "")),
@@ -3414,6 +3859,69 @@ class InventurAppSK:
         }
 
     # ------------------------------------------------------------------
+    # Load existing session (Granules)
+    # ------------------------------------------------------------------
+
+    def load_existing_granules(self):
+        """Resume a previous Granules session by loading Inventory_Granules.xlsx."""
+        if not self.inventur_granules_path.exists():
+            return
+
+        loaded = 0
+        try:
+            df_inv = pd.read_excel(
+                self.inventur_granules_path, sheet_name="Inventory",
+                dtype={"Batch No.": str, "Material No.": str, "Plant": str, "Location": str, "Remarks": str})
+            for _, row in df_inv.iterrows():
+                self.inventur_data_granules.append(self._row_to_granules_dict(row, status="found"))
+                loaded += 1
+        except Exception as e:
+            self.logger.error(f"Error loading Granules Inventory sheet: {e}")
+
+        try:
+            df_nf = pd.read_excel(
+                self.inventur_granules_path, sheet_name="Not_Found",
+                dtype={"Batch No.": str, "Material No.": str, "Plant": str, "Location": str, "Remarks": str})
+            for _, row in df_nf.iterrows():
+                self.not_found_data_granules.append(self._row_to_granules_dict(row, status="not_found"))
+                loaded += 1
+        except Exception:
+            pass
+
+        if loaded:
+            self.update_list()
+            self.status_var.set(
+                f"Granules session resumed: {len(self.inventur_data_granules)} found, "
+                f"{len(self.not_found_data_granules)} not found."
+            )
+            self.logger.info(f"Existing Granules session loaded: {loaded} rows")
+
+    def _row_to_granules_dict(self, row, status):
+        def _str(v):
+            try:
+                if pd.isna(v):
+                    return ""
+            except (TypeError, ValueError):
+                pass
+            s = str(v)
+            return "" if s.lower() == "nan" else s
+
+        return {
+            "zeitstempel": _str(row.get("Timestamp", "")),
+            "werk": _str(row.get("Plant", "")),
+            "lort": _str(row.get("Location", "")),
+            "material": _str(row.get("Material No.", "")),
+            "kurztext": _str(row.get("Description", "")),
+            "charge": _str(row.get("Batch No.", "")),
+            "frei_verw": _fmt_qty(_str(row.get("Free Usable", ""))),
+            "bme": _str(row.get("UOM", "")),
+            "menge": _fmt_qty(_str(row.get("Counted Qty (KG)", ""))),
+            "remarks": _str(row.get("Remarks", "")),
+            "status": status,
+            "_mode": "granules",
+        }
+
+    # ------------------------------------------------------------------
     # Export / Backup
     # ------------------------------------------------------------------
 
@@ -3466,11 +3974,25 @@ class InventurAppSK:
                     self.logger.info(f"WIP backup created: {backup_file}")
                 else:
                     messagebox.showwarning("Warning", "No WIP data file to backup yet.")
+            elif self.warehouse_mode == "Granules":
+                self.save_granules_excel()
+                backup_dir = self.export_granules_path / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                backup_file = backup_dir / f"Inventory_Granules_Backup_{timestamp}.xlsx"
+                if self.inventur_granules_path.exists():
+                    shutil.copy2(self.inventur_granules_path, backup_file)
+                    messagebox.showinfo(
+                        "Backup Created",
+                        f"Backup saved to:\n{backup_file}",
+                    )
+                    self.logger.info(f"Granules backup created: {backup_file}")
+                else:
+                    messagebox.showwarning("Warning", "No Granules data file to backup yet.")
             else:
-                self.save_cz_excel()
+                self.save_halb_excel()
                 backup_dir = self.export_path / "backups"
                 backup_dir.mkdir(parents=True, exist_ok=True)
-                backup_file = backup_dir / f"Inventory_HALB_Backup_{timestamp}.xlsx"
+                backup_file = backup_dir / f"Inventory_{self.halb_mode}_Backup_{timestamp}.xlsx"
                 if self.inventur_path.exists():
                     shutil.copy2(self.inventur_path, backup_file)
                     messagebox.showinfo(
@@ -3500,12 +4022,12 @@ class InventurAppSK:
             self.inventur_data = [
                 d for d in self.inventur_data if d.get("charge") != charge]
             if self.config.get("auto_save", True):
-                self.save_cz_excel()
+                self.save_halb_excel()
         elif action == "add_not_found":
             self.not_found_data = [
                 d for d in self.not_found_data if d.get("charge") != charge]
             if self.config.get("auto_save", True):
-                self.save_cz_excel()
+                self.save_halb_excel()
         elif action == "add_found_zert":
             self.inventur_data_zert = [
                 d for d in self.inventur_data_zert if d.get("charge") != charge]
@@ -3540,6 +4062,16 @@ class InventurAppSK:
                 d for d in self.not_found_data_wip if d.get("order") != order]
             if self.config.get("auto_save", True):
                 self.save_wip_excel()
+        elif action == "add_found_granules":
+            self.inventur_data_granules = [
+                d for d in self.inventur_data_granules if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_granules_excel()
+        elif action == "add_not_found_granules":
+            self.not_found_data_granules = [
+                d for d in self.not_found_data_granules if d.get("charge") != charge]
+            if self.config.get("auto_save", True):
+                self.save_granules_excel()
 
         self.update_list()
         self.status_var.set(f"Undo: removed entry for batch '{charge}'")
@@ -3601,7 +4133,14 @@ class InventurAppSK:
                     entry = next(
                         (d for d in self.not_found_data_wip if d.get("order") == order),
                         None)
-            else:  # SK
+            elif self.warehouse_mode == "Granules":
+                # Treeview may return numeric-looking batches as int -> compare by batch key
+                key = _batch_key(charge)
+                entry = next(
+                    (d for d in self.inventur_data_granules + self.not_found_data_granules
+                     if _batch_key(d.get("charge")) == key),
+                    None)
+            else:  # HALB-type modes
                 entry = next(
                     (d for d in self.inventur_data if d.get("charge") == charge),
                     None)
@@ -3626,7 +4165,7 @@ class InventurAppSK:
 
         row = 0
 
-        if self.warehouse_mode == "SK":
+        if self.warehouse_mode in HALB_MODES:
             # Show identifier (read-only)
             ttk.Label(frame, text="Batch No.:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
@@ -3673,7 +4212,7 @@ class InventurAppSK:
                 entry["fach"] = new_fach
                 entry["brte_meas"] = new_brte
                 entry["remarks"] = new_remarks
-                self.save_cz_excel()
+                self.save_halb_excel()
                 self.update_list()
                 self.status_var.set(f"Entry updated: {entry.get('charge', '')}")
                 dlg.destroy()
@@ -3732,8 +4271,49 @@ class InventurAppSK:
             menge_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
             remarks_entry.bind("<Return>", lambda e: save_edit())
 
+        elif self.warehouse_mode == "Granules":
+            ttk.Label(frame, text="Batch No.:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 16)).grid(
+                row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Counted Qty (KG) *:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            menge_var = tk.StringVar(value=entry.get("menge", ""))
+            menge_entry = ttk.Entry(frame, textvariable=menge_var, font=("Arial", 18), width=15)
+            menge_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            ttk.Label(frame, text="Remarks:", font=("Arial", 16, "bold")).grid(
+                row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
+            remarks_var = tk.StringVar(value=entry.get("remarks", ""))
+            remarks_entry = ttk.Entry(frame, textvariable=remarks_var, font=("Arial", 18), width=40)
+            remarks_entry.grid(row=row, column=1, sticky=tk.W, pady=4)
+            row += 1
+
+            def save_edit():
+                new_menge = menge_var.get().strip()
+                new_remarks = remarks_var.get().strip()
+                if not new_menge:
+                    messagebox.showerror("Validation", "Counted Qty (KG) is required.", parent=dlg)
+                    return
+                if _to_float(new_menge) is None:
+                    messagebox.showerror("Validation", "Counted Qty (KG) must be a number.", parent=dlg)
+                    return
+                entry["menge"] = new_menge
+                entry["remarks"] = new_remarks
+                self.save_granules_excel()
+                self.update_list()
+                self.status_var.set(f"Entry updated: {entry.get('charge', '')}")
+                dlg.destroy()
+
+            menge_entry.focus_set()
+            menge_entry.bind("<Return>", lambda e: remarks_entry.focus_set())
+            remarks_entry.bind("<Return>", lambda e: save_edit())
+
         elif self.warehouse_mode == "Zert":
-            ttk.Label(frame, text="Charge:", font=("Arial", 16, "bold")).grid(
+            ttk.Label(frame, text="Batch No.:", font=("Arial", 16, "bold")).grid(
                 row=row, column=0, sticky=tk.W, pady=4, padx=(0, 10))
             ttk.Label(frame, text=entry.get("charge", ""), font=("Arial", 16)).grid(
                 row=row, column=1, sticky=tk.W, pady=4)
@@ -3876,12 +4456,19 @@ class InventurAppSK:
                     self.not_found_data_zert = [
                         d for d in self.not_found_data_zert if d.get("charge") != charge]
                     self.save_zert_excel()
+                elif self.warehouse_mode == "Granules":
+                    key = _batch_key(charge)
+                    self.inventur_data_granules = [
+                        d for d in self.inventur_data_granules if _batch_key(d.get("charge")) != key]
+                    self.not_found_data_granules = [
+                        d for d in self.not_found_data_granules if _batch_key(d.get("charge")) != key]
+                    self.save_granules_excel()
                 else:
                     self.inventur_data = [
                         d for d in self.inventur_data if d.get("charge") != charge]
                     self.not_found_data = [
                         d for d in self.not_found_data if d.get("charge") != charge]
-                    self.save_cz_excel()
+                    self.save_halb_excel()
 
                 self.update_list()
                 self.status_var.set(f"Entry deleted: {charge}")
@@ -3910,8 +4497,10 @@ class InventurAppSK:
             self.save_kmat_excel()
         elif self.warehouse_mode == "WIP":
             self.save_wip_excel()
+        elif self.warehouse_mode == "Granules":
+            self.save_granules_excel()
         else:
-            self.save_cz_excel()
+            self.save_halb_excel()
         self.status_var.set("Manually saved.")
 
     def quit_app(self):
@@ -3933,7 +4522,7 @@ class InventurAppSK:
 
 def main():
     try:
-        app = InventurAppSK()
+        app = InventurApp()
         app.run()
     except Exception as e:
         messagebox.showerror("Critical Error", f"Unexpected error:\n{e}")
